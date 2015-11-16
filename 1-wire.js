@@ -7,49 +7,78 @@ var deviceInterface;
 
 var awaitDevices = function(){
   // Loop every 1s until a valid device is detected
+  var deviceTimeout = function(){awaitDevices();};
   setTimeout(function(){
-    openDevices(function(result){    
-        if (result)
-          return;
-        awaitDevices();
-    });
+    openDevices(null, deviceTimeout);
   }, 1000);
 };
 
-var openDevices = function(callback){
+function isFunction(functionToCheck) {
+ var getType = {};
+ return functionToCheck && getType.toString.call(functionToCheck) === '[object Function]';
+}
+
+function runIfFunction(functionToCheck)
+{
+  if (isFunction(functionToCheck))
+  {    
+    functionToCheck();
+  }
+}
+
+var openDevices = function(success, failure){
   chrome.usb.findDevices(DEVICE_INFO,
-  function(deviceConnections) {
-     if (!deviceConnections || !deviceConnections.length) {
-       // Fail - Devices not found
-       document.querySelector('#device').innerText = 'Device: Not Found'; 
-       //console.log('device not found');
-       callback();
-       return;
-     }
-     // Success - Devices Found
-     document.querySelector('#device').innerText = 'Device: Found'; 
-     //console.log('Found device: ' + deviceConnections[0].handle);
-     deviceConnection = deviceConnections[0];
-     chrome.usb.listInterfaces(deviceConnection, function(descriptors) {
-        deviceInterface = descriptors[0];
-        //console.log(deviceInterface);
-        initializeInterface();
-        //callback(true);
-      });
+function(deviceConnections) {
+    if (!deviceConnections || !deviceConnections.length) {
+      // Fail - Devices not found
+      document.querySelector('#device').innerText = 'Device: Not Found'; 
+      //console.log('device not found');
+      runIfFunction(failure);
+      return;
+    }
+    // Success - Devices Found
+    document.querySelector('#device').innerText = 'Device: Found'; 
+    //console.log('Found device: ' + deviceConnections[0].handle);
+    deviceConnection = deviceConnections[0];
+    chrome.usb.listInterfaces(deviceConnection, function(descriptors) {
+      deviceInterface = descriptors[0];
+      //console.log(deviceInterface);
+      initializeInterface();
+      runIfFunction(success);
+    });
   });
 };
 
-var initializeInterface = function(callback){
+var initializeInterface = function(){
   // Claim the interface using default configuration and then wait for key
-  chrome.usb.claimInterface(deviceConnection, deviceInterface.interfaceNumber, function(){awaitKey(callback);});
+  chrome.usb.claimInterface(deviceConnection, deviceInterface.interfaceNumber, awaitKey);
 };
 
-var awaitKey = function(callback) {
+var awaitKey = function() {
   // Wait for key to be connected
-  interruptLoop(function(){initializeCommunication(callback);});
+  interruptLoop();
 };
 
-var initializeCommunication = function (callback) {
+var interruptLoop = function()
+{
+  var interruptTimeout = function(result){
+    if (result.ResultRegisters && result.ResultRegisters.DetectDevice){
+      // Success - Device detected
+      initializeCommunication();
+    }
+    else
+    {
+      // Fail - No device found
+      interruptLoop();
+    }
+  };
+  // Loop every 100ms until a key is detected
+  setTimeout(function(){
+    oneWireInterrupt(interruptTimeout);
+  }, 100);
+};
+
+var initializeCommunication = function (success, failure) {
   console.log("Initializing Communication");
   // 1-Wire Search Algorithm
   oneWireReset(function(result){
@@ -58,27 +87,15 @@ var initializeCommunication = function (callback) {
       //console.log(result);
       oneWireRead(1, function(result){
         //console.log(new Uint8Array(result.data));
-        callback();
+        runIfFunction(success);
+        return;
       });
     });
   });
+  runIfFunction(failure);
 };
 
-var interruptLoop = function(callback)
-{
-  // Loop every 100ms until a key is detected
-  setTimeout(function(){
-    oneWireInterrupt(function(interruptResult){  
-      if (interruptResult && interruptResult.ResultRegisters.DetectDevice){
-        callback();
-        return;
-      }
-    });
-    interruptLoop(callback);
-  }, 100);
-};
-
-var oneWireInterrupt = function(callback)
+var oneWireInterrupt = function(success, failure)
 {
   // Perform an Interrupt
   var interruptEndpoint = deviceInterface.endpoints[0];
@@ -89,20 +106,30 @@ var oneWireInterrupt = function(callback)
     length: interruptEndpoint.maximumPacketSize,
     timeout: interruptEndpoint.pollingInterval
   };
-  chrome.usb.interruptTransfer(deviceConnection, transferInfo, function(transferResultInfo){
-      if (transferResultInfo.resultCode) {
+  chrome.usb.interruptTransfer(deviceConnection, transferInfo, function(result){
+      if (result.resultCode) {
         // Fail - Interrupt Failed
-        document.querySelector('#key').innerText = 'Key: Disconnected'; 
-        callback();
+        console.log('Interrupt Error: ' + result.error);
+        runIfFunction(failure);
       }
-      // Success - Interrupt Successful
-      stateRegisters = parseInterruptResponse(transferResultInfo.data);
-      if (stateRegisters.ResultRegisters && stateRegisters.ResultRegisters.DetectDevice)
+      else
       {
-        document.querySelector('#key').innerText = 'Key: Connected'; 
-        //console.log('Key Connected');
-        //console.log(stateRegisters);
-        callback(stateRegisters);
+        // Success - Interrupt Successful
+        stateRegisters = parseInterruptResponse(result.data);
+        if (stateRegisters.ResultRegisters && stateRegisters.ResultRegisters.DetectDevice)
+        {
+          document.querySelector('#key').innerText = 'Key: Connected'; 
+          console.log('Key Connected');
+          //console.log(stateRegisters);
+        }
+        else
+        {
+          document.querySelector('#key').innerText = 'Key: Disconnected'; 
+        }
+        if (isFunction(success))
+        {
+          success(stateRegisters);
+        }
       }
   });
 };
