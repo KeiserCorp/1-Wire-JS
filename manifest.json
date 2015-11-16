@@ -1,0 +1,27 @@
+{
+  "manifest_version": 2,
+  "name": "1-Wire-JS",
+  "short_name": "1-Wire-JS",
+  "description": "Web to USB interface for 1-Wire communication",
+  "version": "0.0.1",
+  "minimum_chrome_version": "31",
+
+  "icons": {
+    "16": "assets/icon_16.png",
+    "128": "assets/icon_128.png"
+  },
+
+  "app": {
+    "background": {
+      "scripts": ["background.js"]
+    }
+  },
+  
+  "permissions": ["usb"],
+  "optional_permissions": [
+    {"usbDevices": [
+      {"vendorId": 1274, "productId": 9360}
+      ]
+    }
+  ]
+}
