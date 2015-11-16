@@ -5,40 +5,60 @@ var DEVICE_INFO = {"vendorId": DALLAS_VENDOR_ID, "productId": DALLAS_PRODUCT_ID}
 var deviceConnection;
 var deviceInterface;
 
-var openDevices = function(){
+var awaitDevices = function(){
+  // Loop every 1s until a valid device is detected
+  setTimeout(function(){
+    openDevices(function(result){    
+        if (result)
+          return;
+        awaitDevices();
+    });
+  }, 1000);
+};
+
+var openDevices = function(callback){
   chrome.usb.findDevices(DEVICE_INFO,
   function(deviceConnections) {
      if (!deviceConnections || !deviceConnections.length) {
-       console.log('device not found');
+       // Fail - Devices not found
+       document.querySelector('#device').innerText = 'Device: Not Found'; 
+       //console.log('device not found');
+       callback();
        return;
      }
-     console.log('Found device: ' + deviceConnections[0].handle);
+     // Success - Devices Found
+     document.querySelector('#device').innerText = 'Device: Found'; 
+     //console.log('Found device: ' + deviceConnections[0].handle);
      deviceConnection = deviceConnections[0];
      chrome.usb.listInterfaces(deviceConnection, function(descriptors) {
         deviceInterface = descriptors[0];
-        console.log(deviceInterface);
+        //console.log(deviceInterface);
         initializeInterface();
+        //callback(true);
       });
   });
 };
 
-var initializeInterface = function(){
-  chrome.usb.claimInterface(deviceConnection, deviceInterface.interfaceNumber, awaitKey);
+var initializeInterface = function(callback){
+  // Claim the interface using default configuration and then wait for key
+  chrome.usb.claimInterface(deviceConnection, deviceInterface.interfaceNumber, function(){awaitKey(callback);});
 };
 
-var awaitKey = function() {
-  interruptLoop(initializeCommunication); // Wait for key to be connected
+var awaitKey = function(callback) {
+  // Wait for key to be connected
+  interruptLoop(function(){initializeCommunication(callback);});
 };
 
-var initializeCommunication = function () {
+var initializeCommunication = function (callback) {
   console.log("Initializing Communication");
-  // 1-Wire Reset
+  // 1-Wire Search Algorithm
   oneWireReset(function(result){
-    console.log(result);
+    //console.log(result);
     oneWireWrite(new Uint8Array([0xF0]), function(result){
-      console.log(result);
+      //console.log(result);
       oneWireRead(1, function(result){
-        console.log(new Uint8Array(result.data));
+        //console.log(new Uint8Array(result.data));
+        callback();
       });
     });
   });
@@ -46,8 +66,9 @@ var initializeCommunication = function () {
 
 var interruptLoop = function(callback)
 {
+  // Loop every 100ms until a key is detected
   setTimeout(function(){
-    oneWireInterrupt(function(interruptResult){    
+    oneWireInterrupt(function(interruptResult){  
       if (interruptResult && interruptResult.ResultRegisters.DetectDevice){
         callback();
         return;
@@ -59,6 +80,7 @@ var interruptLoop = function(callback)
 
 var oneWireInterrupt = function(callback)
 {
+  // Perform an Interrupt
   var interruptEndpoint = deviceInterface.endpoints[0];
   var stateRegisters;
   var transferInfo = {
@@ -69,14 +91,16 @@ var oneWireInterrupt = function(callback)
   };
   chrome.usb.interruptTransfer(deviceConnection, transferInfo, function(transferResultInfo){
       if (transferResultInfo.resultCode) {
-        //console.log('Interrupt Transfer Failed');
+        // Fail - Interrupt Failed
+        document.querySelector('#key').innerText = 'Key: Disconnected'; 
         callback();
       }
-      //console.log('Interrupt Transfer Success');
+      // Success - Interrupt Successful
       stateRegisters = parseInterruptResponse(transferResultInfo.data);
       if (stateRegisters.ResultRegisters && stateRegisters.ResultRegisters.DetectDevice)
       {
-        console.log('Key Connected');
+        document.querySelector('#key').innerText = 'Key: Connected'; 
+        //console.log('Key Connected');
         //console.log(stateRegisters);
         callback(stateRegisters);
       }
@@ -85,8 +109,8 @@ var oneWireInterrupt = function(callback)
 
 
 var parseInterruptResponse = function(responseBuffer){
+  // Parse Interrupt Data in Mfg. Data Attributes
   responseArray = new Uint8Array(responseBuffer);
-  //console.log("Response Size: " + responseArray.length);
   var stateRegisters = {};
   
   stateRegisters.SPUE = responseArray[0] & 0x01;
@@ -128,6 +152,7 @@ var parseInterruptResponse = function(responseBuffer){
 };
 
 var oneWireReset = function(callback){
+  // Perform 1-Wire Reset
   console.log("Performing Reset");
   var transferInfo = {
     direction: 'out',
@@ -143,6 +168,7 @@ var oneWireReset = function(callback){
 };
 
 var oneWireWrite = function(data, callback){
+  // Perform 1-Wire Write
   console.log("Performing Write");
   var bulkOutEndpoint = deviceInterface.endpoints[1];
   var transferInfo = {
@@ -151,22 +177,29 @@ var oneWireWrite = function(data, callback){
     data: new Uint8Array(data).buffer
   };
   chrome.usb.bulkTransfer(deviceConnection, transferInfo, function(result){
-    console.log(result);
-      var transferInfo = {
-      direction: 'out',
-      recipient: 'device',
-      requestType: 'vendor',
-      request: 0x01,
-      value: 0x1075,
-      index: data.length,
-      data: new Uint8Array(0).buffer,
-      timeout: 0
-    };
-    chrome.usb.controlTransfer(deviceConnection, transferInfo, callback);
+    if (result && result.resultCode === 0){
+        // Success - Write was successful
+        var transferInfo = {
+        direction: 'out',
+        recipient: 'device',
+        requestType: 'vendor',
+        request: 0x01,
+        value: 0x1075,
+        index: data.length,
+        data: new Uint8Array(0).buffer,
+        timeout: 0
+      };
+      chrome.usb.controlTransfer(deviceConnection, transferInfo, callback);
+    }
+    else{
+      // Fail - Write failed with error
+      console.log("Write Error: " + result.error);
+    }
   });
 };
 
 var oneWireRead = function(byteCount, callback){
+  // Perform 1-Wire Read
   console.log("Performing Read");
   var bulkInEndpoint = deviceInterface.endpoints[2];
   var transferInfo = {
@@ -175,6 +208,10 @@ var oneWireRead = function(byteCount, callback){
     length: byteCount
   };
   chrome.usb.bulkTransfer(deviceConnection, transferInfo, callback);
+};
+
+var oneWireSearch = function(){
+  
 };
 
 // var genericTransferCallback = function(TransferResultInfo){

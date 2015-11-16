@@ -2,13 +2,13 @@ var permissionObj = {permissions: [{'usbDevices': [DEVICE_INFO] }]};
 
 var gotPermission = function(result) {
   requestButton.style.display = 'none';
-  document.querySelector('#greeting').innerText = 'Permission Granted :)'; 
-  console.log('App was granted the "usbDevices" permission.');
-  openDevices();
+  document.querySelector('#permission').innerText = 'Permission: Granted'; 
+  //console.log('App was granted the "usbDevices" permission.');
+  awaitDevices();
 };
 
 var failedPermission = function(result){
-  document.querySelector('#greeting').innerText = 'Permission Failed :('; 
+  document.querySelector('#permission').innerText = 'Permission: Failed'; 
   console.log('App was not granted the "usbDevices" permission.');
   console.log(chrome.runtime.lastError);
 };
