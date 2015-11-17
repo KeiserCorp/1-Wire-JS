@@ -5,6 +5,8 @@ var DEVICE_INFO = {"vendorId": DALLAS_VENDOR_ID, "productId": DALLAS_PRODUCT_ID}
 var deviceConnection;
 var deviceInterface;
 
+var targetRomID;
+
 var awaitDevices = function(){
   // Loop every 1s until a valid device is detected
   var deviceTimeout = function(){awaitDevices();};
@@ -24,6 +26,16 @@ function runIfFunction(functionToCheck)
   {    
     functionToCheck();
   }
+}
+
+function romIdToString(bytes)
+{
+  var hexChar = ["0", "1", "2", "3", "4", "5", "6", "7","8", "9", "A", "B", "C", "D", "E", "F"];
+  var string = "";
+  bytes.reverse().map(function(byte) {
+    string += hexChar[(byte >> 4) & 0x0f] + hexChar[byte & 0x0f];
+  });
+  return string;
 }
 
 var openDevices = function(success, failure){
@@ -79,25 +91,19 @@ var interruptLoop = function()
 };
 
 var initializeCommunication = function (success, failure) {
-  console.log("Initializing Communication");
-  // 1-Wire Search Algorithm
-  oneWireReset(function(result){
-    //console.log(result);
-    oneWireWrite(new Uint8Array([0xF0]), function(result){
-      //console.log(result);
-      oneWireRead(1, function(result){
-        //console.log(new Uint8Array(result.data));
-        runIfFunction(success);
-        return;
-      });
-    });
-  });
-  runIfFunction(failure);
+  //console.log("Initializing Communication");
+  oneWireSearch(
+    function(result){
+      document.querySelector('#key').innerText = 'Key: Connected - ' + romIdToString(targetRomID); 
+    }, 
+    function(result){console.log("Failure: " + result);}
+    );
 };
 
 var oneWireInterrupt = function(success, failure)
 {
   // Perform an Interrupt
+  //console.log("Performing Interrupt");
   var interruptEndpoint = deviceInterface.endpoints[0];
   var stateRegisters;
   var transferInfo = {
@@ -119,7 +125,7 @@ var oneWireInterrupt = function(success, failure)
         if (stateRegisters.ResultRegisters && stateRegisters.ResultRegisters.DetectDevice)
         {
           document.querySelector('#key').innerText = 'Key: Connected'; 
-          console.log('Key Connected');
+          //console.log('Key Connected');
           //console.log(stateRegisters);
         }
         else
@@ -178,9 +184,9 @@ var parseInterruptResponse = function(responseBuffer){
   return stateRegisters;
 };
 
-var oneWireReset = function(callback){
+var oneWireReset = function(success, failure){
   // Perform 1-Wire Reset
-  console.log("Performing Reset");
+  //console.log("Performing Reset");
   var transferInfo = {
     direction: 'out',
     recipient: 'device',
@@ -191,12 +197,24 @@ var oneWireReset = function(callback){
     data: new Uint8Array(0).buffer,
     timeout: 0
   };
-  chrome.usb.controlTransfer(deviceConnection, transferInfo, callback);
+  chrome.usb.controlTransfer(deviceConnection, transferInfo, function(result){
+    if(result.resultCode)
+    {
+      // Fail - Reset Failed
+      console.log('Reset Error: ' + result.error);
+      runIfFunction(failure);
+    }
+    else
+    {
+      // Success - Reset Successfule
+      runIfFunction(success);
+    }
+  });
 };
 
-var oneWireWrite = function(data, callback){
+var oneWireWrite = function(data, success, failure){
   // Perform 1-Wire Write
-  console.log("Performing Write");
+  //console.log("Performing Write");
   var bulkOutEndpoint = deviceInterface.endpoints[1];
   var transferInfo = {
     direction: bulkOutEndpoint.direction,
@@ -216,35 +234,240 @@ var oneWireWrite = function(data, callback){
         data: new Uint8Array(0).buffer,
         timeout: 0
       };
-      chrome.usb.controlTransfer(deviceConnection, transferInfo, callback);
+      chrome.usb.controlTransfer(deviceConnection, transferInfo, function(result){
+        if(result.resultCode)
+        {
+          // Fail - Write Failed
+          console.log('Write Error: ' + result.error);
+          runIfFunction(failure);
+        }
+        else
+        {
+          // Success - Write Successfule
+          runIfFunction(success);
+        }
+      });
     }
     else{
       // Fail - Write failed with error
       console.log("Write Error: " + result.error);
+      runIfFunction(failure);
     }
   });
 };
 
-var oneWireRead = function(byteCount, callback){
+var oneWireWriteBit = function(bit, success, failure){
+  // Perform 1-Wire Write Bit
+  //console.log("Performing Write Bit");
+  var transferInfo = {
+    direction: 'out',
+    recipient: 'device',
+    requestType: 'vendor',
+    request: 0x01,
+    value: 0x221 | (bit<<3),
+    index: 0x00,
+    data: new Uint8Array(0).buffer,
+    timeout: 0
+  };
+  chrome.usb.controlTransfer(deviceConnection, transferInfo, function(result){
+    if(result.resultCode)
+    {
+      // Fail - Write Bit Failed
+      console.log('Write Bit Error: ' + result.error);
+      runIfFunction(failure);
+    }
+    else
+    {
+      // Success - Write Bit Successfule
+      runIfFunction(success);
+    }
+  });
+};
+
+var oneWireRead = function(byteCount, success, failure){
   // Perform 1-Wire Read
-  console.log("Performing Read");
+  //console.log("Performing Read");
   var bulkInEndpoint = deviceInterface.endpoints[2];
   var transferInfo = {
     direction: bulkInEndpoint.direction,
     endpoint: bulkInEndpoint.address,
     length: byteCount
   };
-  chrome.usb.bulkTransfer(deviceConnection, transferInfo, callback);
+  chrome.usb.bulkTransfer(deviceConnection, transferInfo, function(result){
+    if(result.resultCode)
+    {
+      // Fail - Read Failed
+      console.log('Read Error: ' + result.error);
+      runIfFunction(failure);
+    }
+    else
+    {
+      // Success - Read Successfule
+      if (isFunction(success))
+      {
+        success(new Uint8Array(result.data));
+      }
+    }
+  });
 };
 
-var oneWireSearch = function(){
-  
+var oneWireReadBit = function(success, failture){
+   // Perform 1-Wire Read Bit
+  //console.log("Performing Read Bit");
+  var transferInfo = {
+    direction: 'out',
+    recipient: 'device',
+    requestType: 'vendor',
+    request: 0x01,
+    value: 0x29,
+    index: 0x00,
+    data: new Uint8Array(0).buffer,
+    timeout: 0
+  };
+  chrome.usb.controlTransfer(deviceConnection, transferInfo, function(result){
+    if(result.resultCode)
+    {
+      // Fail - Read Bit Failed
+      console.log('Read Bit Error: ' + result.error);
+      runIfFunction(failure);
+    }
+    else
+    {
+      // Success - Write Successfule
+      oneWireRead(1, function(result){
+        success(result[0]);
+      }, function(result){
+        // Fail - Read Bit Failed
+        console.log('Read Bit Error: ' + result.error);
+        runIfFunction(failure);
+      });
+    }
+  });
 };
 
-// var genericTransferCallback = function(TransferResultInfo){
-//   console.log(TransferResultInfo);
-//   if (TransferResultInfo.resultCode) {
-//     console.log("Error: " + TransferResultInfo.error);
-//     //return;
-//   }
-// };
+
+var LastDescrepancy, LastDeviceFlag = false;
+
+var searchRomLoop = function(searchObject, callback){
+  // Read a bit and its complement
+  oneWireReadBit(function(result){
+    searchObject.IdBit = result;
+    oneWireReadBit(function(result){
+      searchObject.CmpIdBit = result;
+        // Check for no devices on 1-Wire
+        if (searchObject.IdBit !== 1 || searchObject.CmpIdBit !== 1){
+          // All devices coupled have 0 or 1
+          if (searchObject.IdBit != searchObject.CmpIdBit){
+            // Bit write value for search
+            searchObject.SearchDirection = searchObject.IdBit; 
+          }
+          else{
+ 				   	// If this discrepancy is before the Last Discrepancy
+           	// on a previous next then pick the same as last time
+           	if (searchObject.IdBitNumber < searchObject.LastDiscrepancy){
+           		searchObject.SearchDirection = ((searchObject.RomID[searchObject.RomByteNumber] & searchObject.RomByteMask) > 0) ? 1 : 0;
+           	}
+           	else{
+           		// If equal to last pick 1, if not then pick 0
+           		searchObject.SearchDirection = (searchObject.IdBitNumber == searchObject.LastDiscrepancy) ? 1 : 0;
+           	}
+           	
+            // If 0 was picked then record its position in LastZero
+            if (searchObject.SearchDirection === 0) {
+            	searchObject.LastZero = searchObject.IdBitNumber;
+            }
+            
+          }
+          
+          // Set or clear the bit in the ROM byte rom_byte_number
+          // with mask rom_byte_mask
+          if (searchObject.SearchDirection == 1){
+           searchObject.RomID[searchObject.RomByteNumber] |= searchObject.RomByteMask;
+          }
+          else{
+           searchObject.RomID[searchObject.RomByteNumber] &= ~searchObject.RomByteMask;
+          }
+          
+          // Serial number search direction write bit
+          oneWireWriteBit(searchObject.SearchDirection, function(result){
+            // Increment the byte counter id_bit_number
+            // and shift the mask rom_byte_mask
+            searchObject.IdBitNumber++;
+            searchObject.RomByteMask <<= 1;
+            
+            // If the mask is 0 then go to new SerialNum byte rom_byte_number and reset mask
+            if (searchObject.RomByteMask >= 256) {
+                searchObject.RomByteNumber++;
+                searchObject.RomByteMask = 1;
+            }
+            
+            if (searchObject.RomByteNumber < 8) {
+              searchRomLoop(searchObject, callback);
+            }
+            else {
+              // If the search was successful then
+    		      if (searchObject.IdBitNumber >= 65)
+    		      {
+    		         // Search successful so set LastDiscrepancy,LastDeviceFlag,search_result
+    		         LastDiscrepancy = searchObject.LastZero;
+    
+    		         // Check for last device
+    		         if (LastDiscrepancy === 0) {
+    		            LastDeviceFlag = true;
+    		         }
+    
+    		        searchObject.SearchResult = true;
+    		      }
+    		      
+    		      if (searchObject.SearchResult === false || searchObject.RomID[0] === 0) {
+                LastDiscrepancy = 0;
+                LastDeviceFlag = false;
+                searchObject.SearchResult = false;
+              }
+              
+              var returnObject = {
+                RomFound : searchObject.SearchResult,
+                RomID : searchObject.RomID
+              };
+              callback(returnObject);
+            }
+          });
+        }
+    });
+  });
+};
+
+var oneWireSearch = function(success, failure){
+  // Perform 1-Wire Search
+  var searchObject = {
+    IdBitNumber : 1,
+    LastZero : 0,
+    RomByteNumber : 0,
+    RomByteMask : 1,
+    SearchResult : false,
+    IdBit : 0,
+    CmpIdBit : 0,
+    SearchDirection : 0,
+    RomID : new Uint8Array(8)
+  };
+
+  // Starting Search Algorithm
+  if (!LastDeviceFlag){ // If the last call was not the last one
+    oneWireReset(function(result){
+      oneWireWrite(new Uint8Array([0xF0]), function(result){
+        oneWireRead(1, function(result){
+          searchRomLoop(searchObject, function(result){
+            if (result.RomFound) {
+              targetRomID = result.RomID;
+              success();
+            }
+            else
+            {
+              failure();
+            }
+          });
+        });
+      });
+    });
+  }
+};

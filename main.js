@@ -24,7 +24,7 @@ var requestPermission = function(){
 };
 
 function sendInitialMessage(e) {
-  e.target.contentWindow.postMessage("Initialize", "http://devxer.com/1w/*");
+  e.target.contentWindow.postMessage("Initialize", "http://devxer.com/1w/external/");
 }
 
 var requestButton = document.getElementById("requestPermission");
