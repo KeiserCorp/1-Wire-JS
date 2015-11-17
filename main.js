@@ -13,7 +13,7 @@ var failedPermission = function(result){
   console.log(chrome.runtime.lastError);
 };
 
-function requestPermission(){
+var requestPermission = function(){
   chrome.permissions.request(permissionObj, function(result) {
     if (result) {
       gotPermission();
@@ -21,20 +21,29 @@ function requestPermission(){
       failedPermission();
     }
   });
-}
-  
-chrome.permissions.contains(permissionObj, function(result) {
-  if (result) {
-    gotPermission();
-  }
-});
+};
 
+function sendInitialMessage(e) {
+  e.target.contentWindow.postMessage("Initialize", "http://devxer.com/1w/*");
+}
 
 var requestButton = document.getElementById("requestPermission");
-requestButton.addEventListener('click', function() {
-   requestPermission();
-});
-
-// window.onload = function() {
-//   requestPermission();
-// };
+var webView=document.getElementById('webView');
+  
+window.onload = function() {  
+  chrome.permissions.contains(permissionObj, function(result) {
+    if (result) {
+      gotPermission();
+    }
+  });
+  
+  requestButton.addEventListener('click', function() {
+     requestPermission();
+  });
+  
+  window.addEventListener('message', function(e) {
+    console.log("Message Received: ", e.data);
+  });
+  
+  webView.addEventListener('loadstop', sendInitialMessage);
+};
