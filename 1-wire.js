@@ -4,7 +4,6 @@ var DEVICE_INFO = {"vendorId": DALLAS_VENDOR_ID, "productId": DALLAS_PRODUCT_ID}
 
 var deviceConnection;
 var deviceInterface;
-
 var targetRomID;
 
 var awaitDevices = function(){
@@ -76,7 +75,7 @@ var interruptLoop = function()
   var interruptTimeout = function(result){
     if (result.ResultRegisters && result.ResultRegisters.DetectDevice){
       // Success - Device detected
-      initializeCommunication();
+      initializeCommunication(readChipData);
     }
     else
     {
@@ -94,10 +93,95 @@ var initializeCommunication = function (success, failure) {
   //console.log("Initializing Communication");
   oneWireSearch(
     function(result){
-      document.querySelector('#key').innerText = 'Key: Connected - ' + romIdToString(targetRomID); 
+      document.querySelector('#key').innerText = 'Key: Connected - ' + romIdToString(targetRomID);
+      runIfFunction(success);
     }, 
-    function(result){console.log("Failure: " + result);}
+    function(result){console.log("Failure: " + result); runIfFunction(failure);}
     );
+};
+
+var readChipData = function(success, failure){
+  oneWireReset(function(){
+    oneWireMatchRom(function(){
+      var command = new Uint8Array([0xf0, 0x20, 0x00]);
+      var bulkOutEndpoint = deviceInterface.endpoints[1];
+      var transferInfo = {
+        direction: bulkOutEndpoint.direction,
+        endpoint: bulkOutEndpoint.address,
+        data: new Uint8Array(command).buffer
+      };
+      chrome.usb.bulkTransfer(deviceConnection, transferInfo, function(){
+        var transferInfo = {
+          direction: 'out',
+          recipient: 'device',
+          requestType: 'vendor',
+          request: 0x01,
+          value: 0x1075,
+          index: command.length,
+          data: new Uint8Array(0).buffer,
+          timeout: 0
+        };
+        chrome.usb.controlTransfer(deviceConnection, transferInfo, function(result){
+          if(result.resultCode)
+          {
+            // Fail - Read Failed
+            console.log('Read Error: ' + result.error);
+            runIfFunction(failure);
+          }
+          else
+          {
+            // Success - Read Successful
+            oneWireRead(command.length, function(result){
+              console.log(result);
+              var returnArray = new Uint8Array(32);
+              for(var i = 0; i < 32; i++){
+                returnArray[i] = i;
+              }
+              var bulkOutEndpoint = deviceInterface.endpoints[1];
+              var transferInfo = {
+                direction: bulkOutEndpoint.direction,
+                endpoint: bulkOutEndpoint.address,
+                data: new Uint8Array(returnArray).buffer
+              };
+            chrome.usb.bulkTransfer(deviceConnection, transferInfo, function(){
+                var transferInfo = {
+                  direction: 'out',
+                  recipient: 'device',
+                  requestType: 'vendor',
+                  request: 0x01,
+                  value: 0x1075,
+                  index: returnArray.length,
+                  data: new Uint8Array(0).buffer,
+                  timeout: 0
+                };
+                chrome.usb.controlTransfer(deviceConnection, transferInfo, function(result){
+                  if(result.resultCode)
+                  {
+                    // Fail - Read Failed
+                    console.log('Read Error: ' + result.error);
+                    runIfFunction(failure);
+                  }
+                  else
+                  {
+                    // Success - Read Successful
+                    oneWireRead(10000, function(result){
+                      console.log(result);
+                      oneWireRead(200, function(result){
+                        console.log(result);
+                        oneWireRead(500, function(result){
+                          console.log(result);
+                        });
+                      });
+                    });
+                  }
+                });
+              });
+            });
+          }
+        });
+      });
+    });
+  });
 };
 
 var oneWireInterrupt = function(success, failure)
@@ -209,6 +293,42 @@ var oneWireReset = function(success, failure){
       // Success - Reset Successfule
       runIfFunction(success);
     }
+  });
+};
+
+var oneWireMatchRom = function(success, failure){
+  // Perform 1-Wire Rom Match
+  //console.log("Performing Rom Match");
+  var bulkOutEndpoint = deviceInterface.endpoints[1];
+  var transferInfo = {
+    direction: bulkOutEndpoint.direction,
+    endpoint: bulkOutEndpoint.address,
+    data: new Uint8Array(targetRomID).buffer
+  };
+  chrome.usb.bulkTransfer(deviceConnection, transferInfo, function(){
+    var transferInfo = {
+      direction: 'out',
+      recipient: 'device',
+      requestType: 'vendor',
+      request: 0x01,
+      value: 0x0065,
+      index: 0x0055,
+      data: new Uint8Array(0).buffer,
+      timeout: 0
+    };
+    chrome.usb.controlTransfer(deviceConnection, transferInfo, function(result){
+      if(result.resultCode)
+      {
+        // Fail - Match Rom Failed
+        console.log('Match Rom Error: ' + result.error);
+        runIfFunction(failure);
+      }
+      else
+      {
+        // Success - Match Rom Successful
+        runIfFunction(success);
+      }
+    });
   });
 };
 
@@ -459,11 +579,11 @@ var oneWireSearch = function(success, failure){
           searchRomLoop(searchObject, function(result){
             if (result.RomFound) {
               targetRomID = result.RomID;
-              success();
+              runIfFunction(success);
             }
             else
             {
-              failure();
+              runIfFunction(failure);
             }
           });
         });

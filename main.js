@@ -23,12 +23,12 @@ var requestPermission = function(){
   });
 };
 
-function sendInitialMessage(e) {
-  e.target.contentWindow.postMessage("Initialize", "http://devxer.com/1w/external/");
-}
+// function sendInitialMessage(e) {
+//   e.target.contentWindow.postMessage("Initialize", "http://devxer.com/1w/external/");
+// }
 
 var requestButton = document.getElementById("requestPermission");
-var webView=document.getElementById('webView');
+// var webView=document.getElementById('webView');
   
 window.onload = function() {  
   chrome.permissions.contains(permissionObj, function(result) {
@@ -41,9 +41,9 @@ window.onload = function() {
      requestPermission();
   });
   
-  window.addEventListener('message', function(e) {
-    console.log("Message Received: ", e.data);
-  });
+  // window.addEventListener('message', function(e) {
+  //   console.log("Message Received: ", e.data);
+  // });
   
-  webView.addEventListener('loadstop', sendInitialMessage);
+  // webView.addEventListener('loadstop', sendInitialMessage);
 };
