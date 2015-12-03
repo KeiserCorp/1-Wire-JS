@@ -1,20 +1,30 @@
 {
   "name": "1-wire-js",
-  "version": "1.0.0",
-  "description": "1-Wire for Javascript\r ========================",
-  "main": "bundle.js",
+  "version": "0.0.1",
+  "description": "Test app for 1-Wire USB interface",
+  "main": "ow.js",
   "scripts": {
-	"build": "browserify main.js -o bundle.js",
-	"watch": "watchify main.js -o bundle.js --debug --verbose"
+    "build": "gulp",
+    "watch": "gulp watch"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/KeiserCorp/1-Wire-JS.git"
   },
-  "author": "",
+  "author": "Zachary Cardoza",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/KeiserCorp/1-Wire-JS/issues"
   },
-  "homepage": "https://github.com/KeiserCorp/1-Wire-JS#readme"
+  "homepage": "https://github.com/KeiserCorp/1-Wire-JS#readme",
+  "devDependencies": {
+	"q": "^1.4.1",
+    "browserify": "^12.0.1",
+    "gulp": "^3.9.0",
+    "gulp-rename": "^1.2.2",
+    "gulp-streamify": "^1.0.2",
+    "gulp-uglify": "^1.5.1",
+    "gulp-watch": "^4.3.5",
+    "vinyl-source-stream": "^1.1.0"
+  }
 }

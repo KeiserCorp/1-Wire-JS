@@ -1,15 +1,16 @@
-//var permissionObj = {permissions: [{'usbDevices': [DEVICE_INFO] }]};
-var oneWire = require('./ow.js');
+"use strict";
+
+var oneWire = require('../ow.js');
 var ow = oneWire();
 
-var gotPermission = function (result) {
+var gotPermission = function () {
 	requestButton.style.display = 'none';
 	document.querySelector('#permission').innerText = 'Permission: Granted';
 	console.log('App was granted the "usbDevices" permission.');
 	//awaitDevices();
 };
 
-var failedPermission = function (result) {
+var failedPermission = function () {
 	document.querySelector('#permission').innerText = 'Permission: Failed';
 	console.log('App was not granted the "usbDevices" permission.');
 	console.log(chrome.runtime.lastError);
@@ -18,10 +19,9 @@ var failedPermission = function (result) {
 var requestButton = document.getElementById("requestPermission");
 
 window.onload = function () {
-	ow.checkPermission(gotPermission);
+	ow.checkPermission().then(gotPermission);
 
 	requestButton.addEventListener('click', function () {
-		console.log('click');
-		ow.requestPermission(gotPermission, failedPermission);
+		ow.requestPermission().then(gotPermission, failedPermission);
 	});
 };

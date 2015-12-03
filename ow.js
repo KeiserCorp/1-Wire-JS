@@ -1,4 +1,8 @@
+"use strict";
+
 module.exports = function (ow) {
+	var Q = require('q');
+
 	if (typeof ow == 'undefined') {
 		var ow = {};
 	}
@@ -16,29 +20,33 @@ module.exports = function (ow) {
 			}
 		]
 	};
-	
+
 	var permissionStatus = false;
 
-	ow.checkPermission = function (success, failure) {
+	ow.checkPermission = function () {
+		var deferred = Q.defer();
 		chrome.permissions.contains(permissionObj, function (result) {
 			if (result) {
 				permissionStatus = true;
-				success();
+				deferred.resolve();
 			} else {
-				failure();
+				deferred.reject();
 			}
 		});
+		return deferred.promise;
 	};
 
-	ow.requestPermission = function (success, failure) {
+	ow.requestPermission = function () {
+		var deferred = Q.defer();
 		chrome.permissions.request(permissionObj, function (result) {
 			if (result) {
 				permissionStatus = true;
-				success();
+				deferred.resolve();
 			} else {
-				failure();
+				deferred.reject();
 			}
 		});
+		return deferred.promise;
 	};
 
 	return ow;

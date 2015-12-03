@@ -34,3 +34,7 @@ Thumbs.db
 *.vi
 *~
 *.sass-cache
+
+# Project specific files and directories #
+##########################################
+node_modules/
