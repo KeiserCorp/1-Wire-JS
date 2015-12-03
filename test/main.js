@@ -27,6 +27,7 @@ var awaitDevice = function (e) {
 
 var deviceFound = function(){
 	document.querySelector('#device').innerText = 'Device: Found';
+	ow.onDeviceRemoved.addListener(awaitDevice);
 };
 
 var requestButton = document.getElementById("requestPermission");

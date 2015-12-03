@@ -4,7 +4,7 @@
   "short_name": "owjs-test",
   "description": "Test app for 1-Wire USB interface",
   "version": "0.0.1",
-  "minimum_chrome_version": "31",
+  "minimum_chrome_version": "42",
 
   "icons": {
     "16": "assets/icon_16.png",
