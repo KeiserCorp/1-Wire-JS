@@ -104,78 +104,64 @@ var initializeCommunication = function (success, failure) {
 var readChipData = function (success, failure) {
 	oneWireReset(function () {
 		oneWireMatchRom(function () {
-			var command = new Uint8Array([0xf0, 0x20, 0x00]);
-			var bulkOutEndpoint = deviceInterface.endpoints[1];
-			var transferInfo = {
-				direction : bulkOutEndpoint.direction,
-				endpoint : bulkOutEndpoint.address,
-				data : new Uint8Array(command).buffer
-			};
-			chrome.usb.bulkTransfer(deviceConnection, transferInfo, function () {
-				var transferInfo = {
-					direction : 'out',
-					recipient : 'device',
-					requestType : 'vendor',
-					request : 0x01,
-					value : 0x1075,
-					index : command.length,
-					data : new Uint8Array(0).buffer,
-					timeout : 0
-				};
-				chrome.usb.controlTransfer(deviceConnection, transferInfo, function (result) {
-					if (result.resultCode) {
-						// Fail - Read Failed
-						console.log('Read Error: ' + result.error);
-						runIfFunction(failure);
-					} else {
-						// Success - Read Successful
-						oneWireRead(command.length, function (result) {
-							console.log(result);
-							var returnArray = new Uint8Array(32);
-							for (var i = 0; i < 32; i++) {
-								returnArray[i] = i;
-							}
-							var bulkOutEndpoint = deviceInterface.endpoints[1];
-							var transferInfo = {
-								direction : bulkOutEndpoint.direction,
-								endpoint : bulkOutEndpoint.address,
-								data : new Uint8Array(returnArray).buffer
-							};
-							chrome.usb.bulkTransfer(deviceConnection, transferInfo, function () {
-								var transferInfo = {
-									direction : 'out',
-									recipient : 'device',
-									requestType : 'vendor',
-									request : 0x01,
-									value : 0x1075,
-									index : returnArray.length,
-									data : new Uint8Array(0).buffer,
-									timeout : 0
-								};
-								chrome.usb.controlTransfer(deviceConnection, transferInfo, function (result) {
-									if (result.resultCode) {
-										// Fail - Read Failed
-										console.log('Read Error: ' + result.error);
-										runIfFunction(failure);
-									} else {
-										// Success - Read Successful
-										oneWireRead(10000, function (result) {
-											console.log(result);
-											oneWireRead(200, function (result) {
-												console.log(result);
-												oneWireRead(500, function (result) {
-													console.log(result);
-												});
-											});
-										});
-									}
-								});
-							});
-						});
-					}
-				});
+			var start = performance.now();
+			var memory = new Array(256);
+			console.log("Starting Chip Read");
+			readPage(memory, 0, function () {
+				var finish = performance.now();
+				console.log("Finished: " + (finish - start));
+				console.log(memory);
 			});
 		});
+	});
+};
+
+var readPage = function (memory, pageIndex, success) {
+	memory[pageIndex] = new Uint8Array(32);
+	var command = new Uint8Array(35);
+	for (var x = 0; x < command.length; x++) {
+		command[x] = 0xff;
+	}
+	command[0] = 0xf0;
+	command[1] = (pageIndex * 32);
+	command[2] = (pageIndex * 32) >> 8;
+
+	oneWireWrite(command, function () {
+		readPageByteLoop(memory[pageIndex], 0, 3, function () {
+			readPageLoop(memory, pageIndex + 1, success);
+		});
+	});
+};
+
+var readPageLoop = function (memory, pageIndex, success) {
+	setTimeout(function () {
+		memory[pageIndex] = new Uint8Array(32);
+		var command = new Uint8Array(32);
+		for (var x = 0; x < command.length; x++) {
+			command[x] = 0xff;
+		}
+		oneWireWrite(command, function () {
+			readPageByteLoop(memory[pageIndex], 0, 0, function () {
+				if (pageIndex < memory.length - 1) {
+					readPageLoop(memory, pageIndex + 1, success);
+				} else {
+					runIfFunction(success);
+				}
+			});
+		});
+	}, (pageIndex % 10 === 0) ? 10 : 0);
+};
+
+var readPageByteLoop = function (page, index, skip, success) {
+	oneWireRead(1, function (result) {
+		if (skip <= index) {
+			page[index - skip] = result[0];
+		}
+		if (index - skip < page.length - 1) {
+			readPageByteLoop(page, index + 1, skip, success);
+		} else {
+			runIfFunction(success);
+		}
 	});
 };
 
@@ -285,7 +271,7 @@ var oneWireMatchRom = function (success, failure) {
 	var transferInfo = {
 		direction : bulkOutEndpoint.direction,
 		endpoint : bulkOutEndpoint.address,
-		data : new Uint8Array(targetRomID).buffer
+		data : new Uint8Array(targetRomID.reverse()).buffer
 	};
 	chrome.usb.bulkTransfer(deviceConnection, transferInfo, function () {
 		var transferInfo = {
@@ -399,7 +385,7 @@ var oneWireRead = function (byteCount, success, failure) {
 	});
 };
 
-var oneWireReadBit = function (success, failture) {
+var oneWireReadBit = function (success, failure) {
 	// Perform 1-Wire Read Bit
 	//console.log("Performing Read Bit");
 	var transferInfo = {
