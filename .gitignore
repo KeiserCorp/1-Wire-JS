@@ -34,8 +34,3 @@ Thumbs.db
 *.vi
 *~
 *.sass-cache
-
-# Ignore files with source and sample data #
-############################################
-echip-source/
-sample-data/

@@ -1,0 +1,20 @@
+{
+  "name": "1-wire-js",
+  "version": "1.0.0",
+  "description": "1-Wire for Javascript\r ========================",
+  "main": "bundle.js",
+  "scripts": {
+	"build": "browserify main.js -o bundle.js",
+	"watch": "watchify main.js -o bundle.js --debug --verbose"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KeiserCorp/1-Wire-JS.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/KeiserCorp/1-Wire-JS/issues"
+  },
+  "homepage": "https://github.com/KeiserCorp/1-Wire-JS#readme"
+}
