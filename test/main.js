@@ -35,19 +35,22 @@ var deviceFound = function () {
 var awaitKey = function () {
 	var interruptTimeout = function (result) {
 		if (result.ResultRegisters && result.ResultRegisters.DetectKey) {
-			// Success - Key detected
 			document.querySelector('#key').innerText = 'Key: Connected';
-			//initializeCommunication(readChipData);
+			getKeyRom();
 		} else {
-			// Fail - No key found
 			document.querySelector('#key').innerText = 'Key: Disconnected';
 			awaitKey();
 		}
 	};
-	// Loop every 100ms until a key is detected
 	setTimeout(function () {
-			ow.interrupt().then(interruptTimeout);
+		ow.interruptTransfer().then(interruptTimeout);
 	}, 100);
+};
+
+var getKeyRom = function () {
+	ow.keySearchFirst().then(function (rom) {
+		document.querySelector('#key').innerText = 'Key: Connected - ' + rom.toHexString();
+	});
 };
 
 var requestButton = document.getElementById("requestPermission");

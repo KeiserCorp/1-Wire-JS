@@ -1,23 +1,28 @@
-"use strict";
 module.exports = function (ow) {
+	'use strict';
 	var Q = require('q');
+	var crc = require('crc');
 
 	if (typeof ow == 'undefined') {
 		var ow = {};
+	}
+
+	var crc8 = function (value) {
+		return crc.crc81wire(value);
 	}
 
 	/*****************************************
 	 *	Chrome Permissions
 	 *****************************************/
 
-	var DALLAS_VENDOR_ID = 1274; //0x04FA;
-	var DALLAS_PRODUCT_ID = 9360; //0x2490;
-	var DEVICE_INFO = {
-		"vendorId" : DALLAS_VENDOR_ID,
-		"productId" : DALLAS_PRODUCT_ID
+	const DALLAS_VENDOR_ID = 1274; //0x04FA;
+	const DALLAS_PRODUCT_ID = 9360; //0x2490;
+	const DEVICE_INFO = {
+		'vendorId' : DALLAS_VENDOR_ID,
+		'productId' : DALLAS_PRODUCT_ID
 	};
 
-	var permissionObj = {
+	const permissionObj = {
 		permissions : [{
 				'usbDevices' : [DEVICE_INFO]
 			}
@@ -28,10 +33,8 @@ module.exports = function (ow) {
 		var deferred = Q.defer();
 		chrome.permissions.contains(permissionObj, function (result) {
 			if (result) {
-				// Success - Permission already granted
 				deferred.resolve();
 			} else {
-				// Fail - Permission has not yet been granted
 				deferred.reject();
 			}
 		});
@@ -42,10 +45,8 @@ module.exports = function (ow) {
 		var deferred = Q.defer();
 		chrome.permissions.request(permissionObj, function (result) {
 			if (result) {
-				// Success - Permission granted
 				deferred.resolve();
 			} else {
-				// Fail - Permission denied
 				deferred.reject();
 			}
 		});
@@ -65,7 +66,6 @@ module.exports = function (ow) {
 		chrome.usb.getDevices(DEVICE_INFO, function (devices) {
 			chrome.usb.findDevices(DEVICE_INFO, function (connections) {
 				if (connections && connections.length > 0) {
-					// Success - Devices Found
 					deviceConnection = connections[0];
 					deviceObject = devices[0];
 					chrome.usb.listInterfaces(deviceConnection, function (descriptors) {
@@ -74,7 +74,6 @@ module.exports = function (ow) {
 						claimDeviceInterface().then(deferred.resolve);
 					});
 				} else {
-					// Fail - Devices not found
 					deferred.reject();
 				}
 			});
@@ -94,18 +93,18 @@ module.exports = function (ow) {
 
 	var deviceEndpoints = {
 		interrupt : {},
-		in : {},
-		out : {},
+		bulkIn : {},
+		bulkOut : {}
 	};
 
 	var mapEndpoints = function () {
 		deviceInterface.endpoints.forEach(function (endpoint) {
-			if (endpoint.direction == 'in' && endpoint.type == 'interrupt') {
+			if (endpoint.direction === 'in' && endpoint.type === 'interrupt') {
 				deviceEndpoints.interrupt = endpoint;
-			} else if (endpoint.direction == 'in' && endpoint.type == 'bulk') {
-				deviceEndpoints.in = endpoint;
-			} else if (endpoint.direction == 'out' && endpoint.type == 'bulk') {
-				deviceEndpoints.out = endpoint;
+			} else if (endpoint.direction === 'in' && endpoint.type === 'bulk') {
+				deviceEndpoints.bulkIn = endpoint;
+			} else if (endpoint.direction === 'out' && endpoint.type === 'bulk') {
+				deviceEndpoints.bulkOut = endpoint;
 			}
 		});
 	};
@@ -123,15 +122,14 @@ module.exports = function (ow) {
 			this.handlers.push(fn);
 		},
 		removeListener : function (fn) {
-			this.handlers = this.handlers.filter(
-					function (item) {
+			this.handlers = this.handlers.filter(function (item) {
 					if (item !== fn) {
 						return item;
 					}
 				});
 		},
 		dispatch : function (o, thisObj) {
-			var scope = thisObj || window;
+			var scope = thisObj;
 			this.handlers.forEach(function (item) {
 				item.call(scope, o);
 			});
@@ -141,39 +139,16 @@ module.exports = function (ow) {
 	ow.onDeviceRemoved = new DeviceRemovedEvent();
 
 	chrome.usb.onDeviceRemoved.addListener(function (device) {
-		if (device.device == deviceObject.device) {
+		if (device.device === deviceObject.device) {
 			ow.onDeviceRemoved.dispatch();
 		}
 	});
 
 	/*****************************************
-	 *	Device Interrupt
+	 *	Device Interrupt Transfer
 	 *****************************************/
 
-	ow.interrupt = function () {
-		var deferred = Q.defer();
-
-		var transferInfo = {
-			direction : deviceEndpoints.interrupt.direction,
-			endpoint : deviceEndpoints.interrupt.address,
-			length : 0x12 // 18
-		};
-
-		chrome.usb.interruptTransfer(deviceConnection, transferInfo, function (result) {
-			if (result.resultCode) {
-				// Fail - Interrupt Failed
-				deferred.reject();
-			} else {
-				// Success - Interrupt Successful
-				deferred.resolve(parseInterruptResponse(result.data));
-			}
-		});
-
-		return deferred.promise;
-	};
-
 	var parseInterruptResponse = function (responseBuffer) {
-		// Parse Interrupt Data in Mfg. Data Attributes
 		var responseArray = new Uint8Array(responseBuffer);
 		var stateRegisters = {};
 
@@ -197,8 +172,8 @@ module.exports = function (ow) {
 
 		if (responseArray[16]) {
 			stateRegisters.ResultRegisters = {};
-			stateRegisters.ResultRegisters.DetectKey = responseArray[16] == 165;
-			if (responseArray[17] && responseArray[17] != 165) {
+			stateRegisters.ResultRegisters.DetectKey = responseArray[16] === 165;
+			if (responseArray[17] && responseArray[17] !== 165) {
 				stateRegisters.ResultRegisters.EOS = (responseArray[17] >> 7) & 0x01;
 				stateRegisters.ResultRegisters.RDP = (responseArray[17] >> 6) & 0x01;
 				stateRegisters.ResultRegisters.CRC = (responseArray[17] >> 5) & 0x01;
@@ -210,6 +185,317 @@ module.exports = function (ow) {
 		}
 
 		return stateRegisters;
+	};
+
+	ow.interruptTransfer = function () {
+		var deferred = Q.defer();
+
+		var transferInfo = {
+			direction : deviceEndpoints.interrupt.direction,
+			endpoint : deviceEndpoints.interrupt.address,
+			length : 0x12 // 18
+		};
+
+		chrome.usb.interruptTransfer(deviceConnection, transferInfo, function (result) {
+			if (!result.resultCode) {
+				deferred.resolve(parseInterruptResponse(result.data));
+			} else {
+				deferred.reject(result);
+			}
+		});
+
+		return deferred.promise;
+	};
+
+	/*****************************************
+	 *	Device Control Transfer
+	 *****************************************/
+
+	ow.controlTransfer = function (transferInfo) {
+		var deferred = Q.defer();
+
+		chrome.usb.controlTransfer(deviceConnection, transferInfo, function (result) {
+			if (!result.resultCode) {
+				deferred.resolve(result);
+			} else {
+				console.log('Control Transfer Failed: ' + result);
+				deferred.reject(result);
+			}
+		});
+
+		return deferred.promise;
+	};
+
+	/*****************************************
+	 *	Device Bulk Transfer
+	 *****************************************/
+
+	ow.bulkTransfer = function (transferInfo) {
+		var deferred = Q.defer();
+
+		chrome.usb.bulkTransfer(deviceConnection, transferInfo, function (result) {
+			if (!result.resultCode) {
+				deferred.resolve(result);
+			} else {
+				console.log('Bulk Transfer Failed: ' + result);
+				deferred.reject(result);
+			}
+		});
+
+		return deferred.promise;
+	};
+
+	/*****************************************
+	 *	Key Reset
+	 *****************************************/
+
+	ow.keyReset = function () {
+		var transferInfo = {
+			direction : 'out',
+			recipient : 'device',
+			requestType : 'vendor',
+			request : 0x01,
+			value : 0x0C4B,
+			index : 0x0001,
+			data : new Uint8Array(0).buffer,
+			timeout : 0
+		};
+		return ow.controlTransfer(transferInfo);
+	};
+
+	/*****************************************
+	 *	Key Write
+	 *****************************************/
+
+	ow.keyWrite = function (data) {
+		var bulkTransferInfo = {
+			direction : deviceEndpoints.bulkOut.direction,
+			endpoint : deviceEndpoints.bulkOut.address,
+			data : new Uint8Array(data).buffer
+		};
+
+		var controlTransferInfo = {
+			direction : 'out',
+			recipient : 'device',
+			requestType : 'vendor',
+			request : 0x01,
+			value : 0x1075,
+			index : data.length,
+			data : new Uint8Array(0).buffer,
+			timeout : 0
+		};
+
+		return ow.bulkTransfer(bulkTransferInfo)
+		.then(function () {
+			return ow.controlTransfer(controlTransferInfo);
+		});
+	};
+
+	/*****************************************
+	 *	Key Write Bit
+	 *****************************************/
+
+	ow.keyWriteBit = function (bit) {
+		var transferInfo = {
+			direction : 'out',
+			recipient : 'device',
+			requestType : 'vendor',
+			request : 0x01,
+			value : 0x221 | (bit << 3),
+			index : 0x00,
+			data : new Uint8Array(0).buffer,
+			timeout : 0
+		};
+
+		return ow.controlTransfer(transferInfo);
+	};
+
+	/*****************************************
+	 *	Key Read
+	 *****************************************/
+
+	ow.keyRead = function (byteCount) {
+		var transferInfo = {
+			direction : deviceEndpoints.bulkIn.direction,
+			endpoint : deviceEndpoints.bulkIn.address,
+			length : byteCount
+		};
+
+		return ow.bulkTransfer(transferInfo)
+		.then(function (result) {
+			return new Uint8Array(result.data);
+		});
+	};
+
+	/*****************************************
+	 *	Key Read Bit
+	 *****************************************/
+
+	ow.keyReadBit = function () {
+		var transferInfo = {
+			direction : 'out',
+			recipient : 'device',
+			requestType : 'vendor',
+			request : 0x01,
+			value : 0x29,
+			index : 0x00,
+			data : new Uint8Array(0).buffer,
+			timeout : 0
+		};
+
+		return ow.controlTransfer(transferInfo)
+		.then(function (result) {
+			return ow.keyRead(1);
+		})
+		.then(function (data) {
+			return data[0];
+		});
+	};
+
+	/*****************************************
+	 *	Key Search
+	 *****************************************/
+
+	var lastSearchParameters = {
+		lastDiscrepancy : 0,
+		lastDevice : false,
+		keys : []
+	};
+
+	var keySearch = function (parameters) {
+		var deferred = Q.defer();
+
+		romSearch(parameters).then(function (results) {
+			lastSearchParameters = results;
+			if (results.keys && results.keys[0]) {
+				var key = results.keys[0].reverse();
+				key.toHexString = function () {
+					return keyRomToHexString(this);
+				};
+				deferred.resolve(key);
+			} else {
+				deferred.reject();
+			}
+		});
+		return deferred.promise;
+	};
+
+	ow.keySearchFirst = function () {
+		var parameters = {
+			lastDiscrepancy : 0,
+			lastDevice : false,
+			keys : []
+		};
+
+		return keySearch(parameters);
+	};
+
+	ow.keySearchNext = function (parameters) {
+		return keySearch(lastSearchParameters);
+	};
+
+	var romSearch = function (parameters) {
+		var searchObject = {
+			idBitNumber : 1,
+			lastZero : 0,
+			romByteNumber : 0,
+			romByteMask : 1,
+			searchResult : false,
+			idBit : 0,
+			cmpIdBit : 0,
+			searchDirection : 0,
+			romId : new Uint8Array(8),
+			lastDevice : false,
+			lastDiscrepancy : parameters.lastDiscrepancy
+		};
+
+		return ow.keyReset()
+		.then(function () {
+			return ow.keyWrite(new Uint8Array([0xF0]));
+		}).then(function () {
+			return ow.keyRead(1);
+		}).then(function () {
+			return romSubSearch(searchObject);
+		}).then(function (searchResultObject) {
+			if (searchResultObject.searchResult) {
+				parameters.keys.push(searchResultObject.romId)
+			}
+			parameters.lastDiscrepancy = searchResultObject.searchResultObject;
+			parameters.lastDevice = searchResultObject.lastDevice;
+			return parameters;
+		});
+	};
+
+	var romSubSearch = function (searchObject) {
+		return ow.keyReadBit()
+		.then(function (idBit) {
+			searchObject.idBit = idBit;
+		})
+		.then(function () {
+			return ow.keyReadBit();
+		})
+		.then(function (cmpIdBit) {
+			searchObject.cmpIdBit = cmpIdBit;
+			if (searchObject.idBit !== 1 || searchObject.cmpIdBit !== 1) {
+				if (searchObject.idBit != searchObject.cmpIdBit) {
+					searchObject.searchDirection = searchObject.idBit;
+				} else {
+					if (searchObject.idBitNumber < searchObject.lastDiscrepancy) {
+						searchObject.searchDirection = ((searchObject.romId[searchObject.romByteNumber] & searchObject.romByteMask) > 0) ? 1 : 0;
+					} else {
+						searchObject.searchDirection = (searchObject.idBitNumber == searchObject.lastDiscrepancy) ? 1 : 0;
+					}
+					if (searchObject.searchDirection === 0) {
+						searchObject.lastZero = searchObject.idBitNumber;
+					}
+				}
+				if (searchObject.searchDirection === 1) {
+					searchObject.romId[searchObject.romByteNumber] |= searchObject.romByteMask;
+				} else {
+					searchObject.romId[searchObject.romByteNumber] &= ~searchObject.romByteMask;
+				}
+				return ow.keyWriteBit(searchObject.searchDirection)
+				.then(function () {
+					searchObject.idBitNumber++;
+					searchObject.romByteMask <<= 1;
+					if (searchObject.romByteMask >= 256) {
+						searchObject.romByteNumber++;
+						searchObject.romByteMask = 1;
+					}
+					if (searchObject.romByteNumber < 8) {
+						return romSubSearch(searchObject);
+					} else {
+						if (searchObject.idBitNumber >= 65 && crc8(searchObject.romId) === 0) {
+							searchObject.lastDiscrepancy = searchObject.lastZero;
+							if (searchObject.lastDiscrepancy === 0) {
+								searchObject.lastDevice = true;
+							}
+							searchObject.searchResult = true;
+						}
+						if (searchObject.searchResult === false || searchObject.romId[0] === 0) {
+							searchObject.lastDiscrepancy = 0;
+							searchObject.lastDevice = false;
+							searchObject.searchResult = false;
+						}
+						return searchObject;
+					}
+				});
+			} else {
+				return searchObject;
+			}
+		});
+	};
+
+	/*****************************************
+	 *	Key Helpers
+	 *****************************************/
+	var keyRomToHexString = function (data) {
+		const hexChar = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+		var string = '';
+		data.map(function (dataByte) {
+			string += hexChar[(dataByte >> 4) & 0x0f] + hexChar[dataByte & 0x0f];
+		});
+		return string;
 	};
 
 	return ow;
