@@ -16,18 +16,38 @@ var failedPermission = function () {
 };
 
 var awaitDevice = function (e) {
-	var deviceSearchTimeout = function(){
-		chrome.usb.onDeviceAdded.addListener(function(){
+	var deviceSearchTimeout = function () {
+		chrome.usb.onDeviceAdded.addListener(function () {
 			ow.openDevice().then(deviceFound);
 		});
 	};
 	document.querySelector('#device').innerText = 'Device: Not Found';
-	ow.openDevice().then(deviceFound ,deviceSearchTimeout);
+	ow.openDevice().then(deviceFound, deviceSearchTimeout);
 };
 
-var deviceFound = function(){
+var deviceFound = function () {
 	document.querySelector('#device').innerText = 'Device: Found';
 	ow.onDeviceRemoved.addListener(awaitDevice);
+
+	awaitKey();
+};
+
+var awaitKey = function () {
+	var interruptTimeout = function (result) {
+		if (result.ResultRegisters && result.ResultRegisters.DetectKey) {
+			// Success - Key detected
+			document.querySelector('#key').innerText = 'Key: Connected';
+			//initializeCommunication(readChipData);
+		} else {
+			// Fail - No key found
+			document.querySelector('#key').innerText = 'Key: Disconnected';
+			awaitKey();
+		}
+	};
+	// Loop every 100ms until a key is detected
+	setTimeout(function () {
+			ow.interrupt().then(interruptTimeout);
+	}, 100);
 };
 
 var requestButton = document.getElementById("requestPermission");
