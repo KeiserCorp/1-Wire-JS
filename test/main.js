@@ -22,6 +22,8 @@ var awaitDevice = function (e) {
 		});
 	};
 	document.querySelector('#device').innerText = 'Device: Not Found';
+	document.querySelector('#key').innerText = 'Key: Disconnected';
+	document.querySelector('#rom').innerText = 'ID:';
 	ow.openDevice().then(deviceFound, deviceSearchTimeout);
 };
 
@@ -39,17 +41,26 @@ var awaitKey = function () {
 			getKeyRom();
 		} else {
 			document.querySelector('#key').innerText = 'Key: Disconnected';
+			document.querySelector('#rom').innerText = 'ID:';
 			awaitKey();
 		}
 	};
 	setTimeout(function () {
 		ow.interruptTransfer().then(interruptTimeout);
-	}, 100);
+	}, 500);
 };
 
 var getKeyRom = function () {
+	var keyRom;
 	ow.keySearchFirst().then(function (rom) {
-		document.querySelector('#key').innerText = 'Key: Connected - ' + rom.toHexString();
+		document.querySelector('#rom').innerText = 'ID: ' + rom.toHexString();
+		keyRom = rom; // Needs to be rewritten to handle this cleaner
+	}).then(function () {
+		setTimeout(function () {
+			ow.keyReadAll(keyRom).then(function (result) {
+				console.log(result);
+			});
+		}, 500);
 	});
 };
 

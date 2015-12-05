@@ -3,7 +3,7 @@ module.exports = function (ow) {
 	var Q = require('q');
 	var crc = require('crc');
 
-	if (typeof ow == 'undefined') {
+	if (typeof ow === 'undefined') {
 		var ow = {};
 	}
 
@@ -218,7 +218,7 @@ module.exports = function (ow) {
 			if (!result.resultCode) {
 				deferred.resolve(result);
 			} else {
-				console.log('Control Transfer Failed: ' + result);
+				console.log('Control Transfer Failed');
 				deferred.reject(result);
 			}
 		});
@@ -237,7 +237,7 @@ module.exports = function (ow) {
 			if (!result.resultCode) {
 				deferred.resolve(result);
 			} else {
-				console.log('Bulk Transfer Failed: ' + result);
+				console.log('Bulk Transfer Failed');
 				deferred.reject(result);
 			}
 		});
@@ -246,10 +246,10 @@ module.exports = function (ow) {
 	};
 
 	/*****************************************
-	 *	Key Reset
+	 *	1-Wire Reset
 	 *****************************************/
 
-	ow.keyReset = function () {
+	ow.wireReset = function () {
 		var transferInfo = {
 			direction : 'out',
 			recipient : 'device',
@@ -264,10 +264,10 @@ module.exports = function (ow) {
 	};
 
 	/*****************************************
-	 *	Key Write
+	 *	1-Wire Write
 	 *****************************************/
 
-	ow.keyWrite = function (data) {
+	ow.wireWrite = function (data) {
 		var bulkTransferInfo = {
 			direction : deviceEndpoints.bulkOut.direction,
 			endpoint : deviceEndpoints.bulkOut.address,
@@ -292,10 +292,10 @@ module.exports = function (ow) {
 	};
 
 	/*****************************************
-	 *	Key Write Bit
+	 *	1-Wire Write Bit
 	 *****************************************/
 
-	ow.keyWriteBit = function (bit) {
+	ow.wireWriteBit = function (bit) {
 		var transferInfo = {
 			direction : 'out',
 			recipient : 'device',
@@ -311,10 +311,10 @@ module.exports = function (ow) {
 	};
 
 	/*****************************************
-	 *	Key Read
+	 *	1-Wire Read
 	 *****************************************/
 
-	ow.keyRead = function (byteCount) {
+	ow.wireRead = function (byteCount) {
 		var transferInfo = {
 			direction : deviceEndpoints.bulkIn.direction,
 			endpoint : deviceEndpoints.bulkIn.address,
@@ -328,10 +328,10 @@ module.exports = function (ow) {
 	};
 
 	/*****************************************
-	 *	Key Read Bit
+	 *	1-Wire Read Bit
 	 *****************************************/
 
-	ow.keyReadBit = function () {
+	ow.wireReadBit = function () {
 		var transferInfo = {
 			direction : 'out',
 			recipient : 'device',
@@ -345,10 +345,48 @@ module.exports = function (ow) {
 
 		return ow.controlTransfer(transferInfo)
 		.then(function (result) {
-			return ow.keyRead(1);
+			return ow.wireRead(1);
 		})
 		.then(function (data) {
 			return data[0];
+		});
+	};
+
+	/*****************************************
+	 *	1-Wire Clear Byte
+	 *****************************************/
+
+	ow.wireClearByte = function () {
+		return ow.wireRead(1).then(function (result) {
+			console.log(result);
+		});
+	};
+
+	/*****************************************
+	 *	Key ROM Match
+	 *****************************************/
+
+	ow.keyRomMatch = function (keyRom) {
+		var bulkTransferInfo = {
+			direction : deviceEndpoints.bulkOut.direction,
+			endpoint : deviceEndpoints.bulkOut.address,
+			data : new Uint8Array(keyRom).buffer
+		};
+
+		var controlTransferInfo = {
+			direction : 'out',
+			recipient : 'device',
+			requestType : 'vendor',
+			request : 0x01,
+			value : 0x0065,
+			index : 0x0055,
+			data : new Uint8Array(0).buffer,
+			timeout : 0
+		};
+
+		return ow.bulkTransfer(bulkTransferInfo)
+		.then(function () {
+			return ow.controlTransfer(controlTransferInfo);
 		});
 	};
 
@@ -409,11 +447,11 @@ module.exports = function (ow) {
 			lastDiscrepancy : parameters.lastDiscrepancy
 		};
 
-		return ow.keyReset()
+		return ow.wireReset()
 		.then(function () {
-			return ow.keyWrite(new Uint8Array([0xF0]));
+			return ow.wireWrite(new Uint8Array([0xF0]));
 		}).then(function () {
-			return ow.keyRead(1);
+			return ow.wireClearByte();
 		}).then(function () {
 			return romSubSearch(searchObject);
 		}).then(function (searchResultObject) {
@@ -427,12 +465,12 @@ module.exports = function (ow) {
 	};
 
 	var romSubSearch = function (searchObject) {
-		return ow.keyReadBit()
+		return ow.wireReadBit()
 		.then(function (idBit) {
 			searchObject.idBit = idBit;
 		})
 		.then(function () {
-			return ow.keyReadBit();
+			return ow.wireReadBit();
 		})
 		.then(function (cmpIdBit) {
 			searchObject.cmpIdBit = cmpIdBit;
@@ -454,7 +492,7 @@ module.exports = function (ow) {
 				} else {
 					searchObject.romId[searchObject.romByteNumber] &= ~searchObject.romByteMask;
 				}
-				return ow.keyWriteBit(searchObject.searchDirection)
+				return ow.wireWriteBit(searchObject.searchDirection)
 				.then(function () {
 					searchObject.idBitNumber++;
 					searchObject.romByteMask <<= 1;
@@ -487,7 +525,65 @@ module.exports = function (ow) {
 	};
 
 	/*****************************************
-	 *	Key Helpers
+	 *	Key Read All Data
+	 *****************************************/
+
+	ow.keyReadAll = function (keyRom) {
+		return ow.wireReset()
+		.then(function () {
+			return ow.keyRomMatch(keyRom);
+		}).then(function () {
+			var command = new Uint8Array([0xF0, 0x00, 0x00]);
+			return ow.wireWrite(command);
+		}).then(function () {
+			return ow.wireClearByte() // Breaks Here --------------
+			.then(wireClearByte)
+			.then(wireClearByte);
+		}).then(function () {
+			return keyReadMemory();
+		});
+	};
+
+	var keyReadMemory = function (memory, pageIndex) {
+		if (typeof pageIndex === 'undefined') {
+			var pageIndex = 0;
+		}
+		if (typeof memory === 'undefined') {
+			var memory = [256];
+		}
+		console.log('Reading Page: ' + pageIndex);
+		memory[pageIndex] = new Uint8Array(32);
+		var buffer = new Uint8Array(32);
+		for (var x = 0; x < buffer.length; x++) {
+			buffer[x] = 0xFF;
+		}
+		return ow.wireWrite(buffer)
+		.then(function () {
+			return keyReadPage(memory[pageIndex]);
+		}).then(function () {
+			if (pageIndex < memory.length - 1) {
+				return keyReadMemory(memory, pageIndex + 1);
+			}
+			return memory;
+		});
+	}
+
+	var keyReadPage = function (page, index) {
+		if (typeof index == 'undefined') {
+			var index = 0;
+		}
+		return ow.wireRead(1)
+		.then(function (result) {
+			page[index] = result[0];
+			console.log('Reading Page Byte: ' + index + ' =>' + result[0]);
+			if (index < page.length - 1) {
+				return keyReadPage(page, index + 1);
+			}
+		});
+	};
+
+	/*****************************************
+	 *	Key ROM Bytes to Hex String
 	 *****************************************/
 	var keyRomToHexString = function (data) {
 		const hexChar = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
