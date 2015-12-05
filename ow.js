@@ -139,7 +139,7 @@ module.exports = function (ow) {
 	ow.onDeviceRemoved = new DeviceRemovedEvent();
 
 	chrome.usb.onDeviceRemoved.addListener(function (device) {
-		if (device.device === deviceObject.device) {
+		if (device && device.device === deviceObject.device) {
 			ow.onDeviceRemoved.dispatch();
 		}
 	});
@@ -357,9 +357,7 @@ module.exports = function (ow) {
 	 *****************************************/
 
 	ow.wireClearByte = function () {
-		return ow.wireRead(1).then(function (result) {
-			console.log(result);
-		});
+		return ow.wireRead(1);
 	};
 
 	/*****************************************
@@ -370,7 +368,7 @@ module.exports = function (ow) {
 		var bulkTransferInfo = {
 			direction : deviceEndpoints.bulkOut.direction,
 			endpoint : deviceEndpoints.bulkOut.address,
-			data : new Uint8Array(keyRom).buffer
+			data : new Uint8Array(keyRom.reverse()).buffer
 		};
 
 		var controlTransferInfo = {
@@ -450,9 +448,8 @@ module.exports = function (ow) {
 		return ow.wireReset()
 		.then(function () {
 			return ow.wireWrite(new Uint8Array([0xF0]));
-		}).then(function () {
-			return ow.wireClearByte();
-		}).then(function () {
+		}).then(ow.wireClearByte)
+		.then(function () {
 			return romSubSearch(searchObject);
 		}).then(function (searchResultObject) {
 			if (searchResultObject.searchResult) {
@@ -535,11 +532,10 @@ module.exports = function (ow) {
 		}).then(function () {
 			var command = new Uint8Array([0xF0, 0x00, 0x00]);
 			return ow.wireWrite(command);
-		}).then(function () {
-			return ow.wireClearByte() // Breaks Here --------------
-			.then(wireClearByte)
-			.then(wireClearByte);
-		}).then(function () {
+		}).then(ow.wireClearByte)
+		.then(ow.wireClearByte)
+		.then(ow.wireClearByte)
+		.then(function () {
 			return keyReadMemory();
 		});
 	};
@@ -549,9 +545,8 @@ module.exports = function (ow) {
 			var pageIndex = 0;
 		}
 		if (typeof memory === 'undefined') {
-			var memory = [256];
+			var memory = new Array(256);
 		}
-		console.log('Reading Page: ' + pageIndex);
 		memory[pageIndex] = new Uint8Array(32);
 		var buffer = new Uint8Array(32);
 		for (var x = 0; x < buffer.length; x++) {
@@ -575,7 +570,6 @@ module.exports = function (ow) {
 		return ow.wireRead(1)
 		.then(function (result) {
 			page[index] = result[0];
-			console.log('Reading Page Byte: ' + index + ' =>' + result[0]);
 			if (index < page.length - 1) {
 				return keyReadPage(page, index + 1);
 			}
