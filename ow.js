@@ -11,6 +11,9 @@ module.exports = function (ow) {
 		return crc.crc81wire(value);
 	}
 
+	const TRANSACTION_TIMEOUT = 10;
+	var OverdriveEnabled = false;
+
 	/*****************************************
 	 *	Chrome Permissions
 	 *****************************************/
@@ -148,6 +151,26 @@ module.exports = function (ow) {
 	 *	Device Interrupt Transfer
 	 *****************************************/
 
+	ow.interruptTransfer = function () {
+		var deferred = Q.defer();
+
+		var transferInfo = {
+			direction : deviceEndpoints.interrupt.direction,
+			endpoint : deviceEndpoints.interrupt.address,
+			length : 0x12 // 18
+		};
+
+		chrome.usb.interruptTransfer(deviceConnection, transferInfo, function (result) {
+			if (!result.resultCode) {
+				deferred.resolve(parseInterruptResponse(result.data));
+			} else {
+				deferred.reject(result);
+			}
+		});
+
+		return deferred.promise;
+	};
+
 	var parseInterruptResponse = function (responseBuffer) {
 		var responseArray = new Uint8Array(responseBuffer);
 		var stateRegisters = {};
@@ -185,26 +208,6 @@ module.exports = function (ow) {
 		}
 
 		return stateRegisters;
-	};
-
-	ow.interruptTransfer = function () {
-		var deferred = Q.defer();
-
-		var transferInfo = {
-			direction : deviceEndpoints.interrupt.direction,
-			endpoint : deviceEndpoints.interrupt.address,
-			length : 0x12 // 18
-		};
-
-		chrome.usb.interruptTransfer(deviceConnection, transferInfo, function (result) {
-			if (!result.resultCode) {
-				deferred.resolve(parseInterruptResponse(result.data));
-			} else {
-				deferred.reject(result);
-			}
-		});
-
-		return deferred.promise;
 	};
 
 	/*****************************************
@@ -246,6 +249,25 @@ module.exports = function (ow) {
 	};
 
 	/*****************************************
+	 *	1-Wire Set Speed
+	 *****************************************/
+
+	ow.wireSetSpeed = function (overdrive) {
+		var index = (typeof overdrive !== 'undefined' && overdrive) ? 0x0002 : 0x0001;
+		var transferInfo = {
+			direction : 'out',
+			recipient : 'device',
+			requestType : 'vendor',
+			request : 0x02,
+			value : 0x0002,
+			index : index,
+			data : new Uint8Array(0).buffer,
+			timeout : TRANSACTION_TIMEOUT
+		};
+		return ow.controlTransfer(transferInfo);
+	};
+
+	/*****************************************
 	 *	1-Wire Reset
 	 *****************************************/
 
@@ -258,8 +280,24 @@ module.exports = function (ow) {
 			value : 0x0C4B,
 			index : 0x0001,
 			data : new Uint8Array(0).buffer,
-			timeout : 0
+			timeout : TRANSACTION_TIMEOUT
 		};
+
+		return ow.controlTransfer(transferInfo);
+	};
+
+	ow.wireResetOverdrive = function () {
+		var transferInfo = {
+			direction : 'out',
+			recipient : 'device',
+			requestType : 'vendor',
+			request : 0x01,
+			value : 0x0C4B,
+			index : 0x0002,
+			data : new Uint8Array(0).buffer,
+			timeout : TRANSACTION_TIMEOUT
+		};
+
 		return ow.controlTransfer(transferInfo);
 	};
 
@@ -282,7 +320,7 @@ module.exports = function (ow) {
 			value : 0x1075,
 			index : data.length,
 			data : new Uint8Array(0).buffer,
-			timeout : 0
+			timeout : TRANSACTION_TIMEOUT
 		};
 
 		return ow.bulkTransfer(bulkTransferInfo)
@@ -304,7 +342,7 @@ module.exports = function (ow) {
 			value : 0x221 | (bit << 3),
 			index : 0x00,
 			data : new Uint8Array(0).buffer,
-			timeout : 0
+			timeout : TRANSACTION_TIMEOUT
 		};
 
 		return ow.controlTransfer(transferInfo);
@@ -340,7 +378,7 @@ module.exports = function (ow) {
 			value : 0x29,
 			index : 0x00,
 			data : new Uint8Array(0).buffer,
-			timeout : 0
+			timeout : TRANSACTION_TIMEOUT
 		};
 
 		return ow.controlTransfer(transferInfo)
@@ -366,21 +404,22 @@ module.exports = function (ow) {
 
 	ow.keyRomCommand = function (match, keyRom, overdrive) {
 		var index;
+		overdrive = (typeof overdrive !== 'undefined' && overdrive);
 		var bulkTransferInfo = {
 			direction : deviceEndpoints.bulkOut.direction,
 			endpoint : deviceEndpoints.bulkOut.address,
-			data : new Uint8Array(0).buffer
+			data : new Uint8Array(8).buffer
 		};
-		
+
 		if (typeof match !== 'undefined' && match) {
 			bulkTransferInfo.data = new Uint8Array(keyRom.reverse()).buffer;
-			if (typeof overdrive !== 'undefined' && overdrive) {
+			if (overdrive) {
 				index = 0x0069;
 			} else {
 				index = 0x0055;
 			}
 		} else {
-			if (typeof overdrive !== 'undefined' && overdrive) {
+			if (overdrive) {
 				index = 0x003C;
 			} else {
 				index = 0x00CC;
@@ -395,12 +434,15 @@ module.exports = function (ow) {
 			value : 0x0065,
 			index : index,
 			data : new Uint8Array(0).buffer,
-			timeout : 0
+			timeout : TRANSACTION_TIMEOUT
 		};
 
-		return ow.bulkTransfer(bulkTransferInfo)
+		return ow.controlTransfer(controlTransferInfo)
 		.then(function () {
-			return ow.controlTransfer(controlTransferInfo);
+			OverdriveEnabled = overdrive;
+			return ow.wireSetSpeed(overdrive);
+		}).then(function () {
+			return ow.bulkTransfer(bulkTransferInfo)
 		});
 	};
 
@@ -565,11 +607,17 @@ module.exports = function (ow) {
 	 *	Key Read All Data
 	 *****************************************/
 
-	ow.keyReadAll = function (keyRom) {
-		return ow.wireReset()
+	ow.keyReadAll = function (keyRom, overdrive) {
+		return ow.wireSetSpeed(false)
+		.then(ow.wireReset)
 		.then(function () {
-			return ow.keyRomMatch(keyRom);
-		}).then(function () {
+			if (typeof overdrive !== 'undefined' && overdrive) {
+				return ow.keyRomMatchOverdrive(keyRom);
+			} else {
+				return ow.keyRomMatch(keyRom);
+			}
+		})
+		.then(function () {
 			var command = new Uint8Array([0xF0, 0x00, 0x00]);
 			return ow.wireWrite(command);
 		}).then(ow.wireClearByte)
@@ -577,6 +625,12 @@ module.exports = function (ow) {
 		.then(ow.wireClearByte)
 		.then(function () {
 			return keyReadMemory();
+		}).then(function (data) {
+			return ow.wireReset().then(function () {
+				return ow.wireSetSpeed(false);
+			}).then(function () {
+				return data;
+			});
 		});
 	};
 
@@ -592,6 +646,7 @@ module.exports = function (ow) {
 		for (var x = 0; x < buffer.length; x++) {
 			buffer[x] = 0xFF;
 		}
+		//console.log('Page: ' + pageIndex);
 		return ow.wireWrite(buffer)
 		.then(function () {
 			return keyReadPage(memory[pageIndex]);
@@ -607,11 +662,13 @@ module.exports = function (ow) {
 		if (typeof index == 'undefined') {
 			var index = 0;
 		}
-		return ow.wireRead(1)
+		return ow.wireRead((OverdriveEnabled) ? 16 : 1)
 		.then(function (result) {
-			page[index] = result[0];
-			if (index < page.length - 1) {
-				return keyReadPage(page, index + 1);
+			result.forEach(function (entry) {
+				page[index++] = entry;
+			});
+			if (index < page.length) {
+				return keyReadPage(page, index);
 			}
 		});
 	};

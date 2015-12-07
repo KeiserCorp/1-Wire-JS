@@ -30,14 +30,12 @@ var awaitDevice = function (e) {
 var deviceFound = function () {
 	document.querySelector('#device').innerText = 'Device: Found';
 	ow.onDeviceRemoved.addListener(awaitDevice);
-
 	awaitKey();
 };
 
 var awaitKey = function () {
 	var interruptTimeout = function (result) {
 		if (result.ResultRegisters && result.ResultRegisters.DetectKey) {
-			console.log(result);
 			document.querySelector('#key').innerText = 'Key: Connected';
 			getKeyRom();
 		} else {
@@ -54,15 +52,23 @@ var awaitKey = function () {
 var getKeyRom = function () {
 	var start;
 	var finish;
-	
+	var keyRom;
 	return ow.keySearchFirst()
-	.then(function (keyRom) {
+	.then(function (rom) {
+		keyRom = rom;
 		document.querySelector('#rom').innerText = 'ID: ' + keyRom.toHexString();
 		start = performance.now();
 		return ow.keyReadAll(keyRom);
 	}).then(function (data) {
 		finish = performance.now();
-		console.log('All key memory read in ' + ((finish - start) /1000).toFixed(2)+ 's');
+		console.log('Standard Memory Flush: ' + ((finish - start) / 1000).toFixed(2) + 's');
+		console.log(data);
+	}).then(function () {
+		start = performance.now();
+		return ow.keyReadAll(keyRom, true);
+	}).then(function (data) {
+		finish = performance.now();
+		console.log('Overdrive Memory Flush: ' + ((finish - start) / 1000).toFixed(2) + 's');
 		console.log(data);
 	});
 };
