@@ -4572,15 +4572,31 @@ module.exports = function (ow) {
 	};
 
 	/*****************************************
-	 *	Key ROM Match
+	 *	Key ROM Command
 	 *****************************************/
 
-	ow.keyRomMatch = function (keyRom) {
+	ow.keyRomCommand = function (match, keyRom, overdrive) {
+		var index;
 		var bulkTransferInfo = {
 			direction : deviceEndpoints.bulkOut.direction,
 			endpoint : deviceEndpoints.bulkOut.address,
-			data : new Uint8Array(keyRom.reverse()).buffer
+			data : new Uint8Array(0).buffer
 		};
+		
+		if (typeof match !== 'undefined' && match) {
+			bulkTransferInfo.data = new Uint8Array(keyRom.reverse()).buffer;
+			if (typeof overdrive !== 'undefined' && overdrive) {
+				index = 0x0069;
+			} else {
+				index = 0x0055;
+			}
+		} else {
+			if (typeof overdrive !== 'undefined' && overdrive) {
+				index = 0x003C;
+			} else {
+				index = 0x00CC;
+			}
+		}
 
 		var controlTransferInfo = {
 			direction : 'out',
@@ -4588,7 +4604,7 @@ module.exports = function (ow) {
 			requestType : 'vendor',
 			request : 0x01,
 			value : 0x0065,
-			index : 0x0055,
+			index : index,
 			data : new Uint8Array(0).buffer,
 			timeout : 0
 		};
@@ -4597,6 +4613,30 @@ module.exports = function (ow) {
 		.then(function () {
 			return ow.controlTransfer(controlTransferInfo);
 		});
+	};
+
+	/*****************************************
+	 *	Key ROM Match
+	 *****************************************/
+
+	ow.keyRomMatch = function (keyRom) {
+		return ow.keyRomCommand(true, keyRom, false);
+	};
+
+	ow.keyRomMatchOverdrive = function (keyRom) {
+		return ow.keyRomCommand(true, keyRom, true);
+	};
+
+	/*****************************************
+	 *	Key ROM Skip
+	 *****************************************/
+
+	ow.keyRomSkip = function () {
+		return ow.keyRomCommand(false, null, false);
+	};
+
+	ow.keyRomSkipOverdrive = function () {
+		return ow.keyRomCommand(false, null, true);
 	};
 
 	/*****************************************
@@ -4842,6 +4882,7 @@ var deviceFound = function () {
 var awaitKey = function () {
 	var interruptTimeout = function (result) {
 		if (result.ResultRegisters && result.ResultRegisters.DetectKey) {
+			console.log(result);
 			document.querySelector('#key').innerText = 'Key: Connected';
 			getKeyRom();
 		} else {
@@ -4856,16 +4897,18 @@ var awaitKey = function () {
 };
 
 var getKeyRom = function () {
-	var keyRom;
-	ow.keySearchFirst().then(function (rom) {
-		document.querySelector('#rom').innerText = 'ID: ' + rom.toHexString();
-		keyRom = rom; // Needs to be rewritten to handle this cleaner
-	}).then(function () {
-		setTimeout(function () {
-			ow.keyReadAll(keyRom).then(function (result) {
-				console.log(result);
-			});
-		}, 500);
+	var start;
+	var finish;
+	
+	return ow.keySearchFirst()
+	.then(function (keyRom) {
+		document.querySelector('#rom').innerText = 'ID: ' + keyRom.toHexString();
+		start = performance.now();
+		return ow.keyReadAll(keyRom);
+	}).then(function (data) {
+		finish = performance.now();
+		console.log('All key memory read in ' + ((finish - start) /1000).toFixed(2)+ 's');
+		console.log(data);
 	});
 };
 

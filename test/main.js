@@ -37,6 +37,7 @@ var deviceFound = function () {
 var awaitKey = function () {
 	var interruptTimeout = function (result) {
 		if (result.ResultRegisters && result.ResultRegisters.DetectKey) {
+			console.log(result);
 			document.querySelector('#key').innerText = 'Key: Connected';
 			getKeyRom();
 		} else {
@@ -51,16 +52,18 @@ var awaitKey = function () {
 };
 
 var getKeyRom = function () {
-	var keyRom;
-	ow.keySearchFirst().then(function (rom) {
-		document.querySelector('#rom').innerText = 'ID: ' + rom.toHexString();
-		keyRom = rom; // Needs to be rewritten to handle this cleaner
-	}).then(function () {
-		setTimeout(function () {
-			ow.keyReadAll(keyRom).then(function (result) {
-				console.log(result);
-			});
-		}, 500);
+	var start;
+	var finish;
+	
+	return ow.keySearchFirst()
+	.then(function (keyRom) {
+		document.querySelector('#rom').innerText = 'ID: ' + keyRom.toHexString();
+		start = performance.now();
+		return ow.keyReadAll(keyRom);
+	}).then(function (data) {
+		finish = performance.now();
+		console.log('All key memory read in ' + ((finish - start) /1000).toFixed(2)+ 's');
+		console.log(data);
 	});
 };
 

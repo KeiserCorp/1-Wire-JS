@@ -361,15 +361,31 @@ module.exports = function (ow) {
 	};
 
 	/*****************************************
-	 *	Key ROM Match
+	 *	Key ROM Command
 	 *****************************************/
 
-	ow.keyRomMatch = function (keyRom) {
+	ow.keyRomCommand = function (match, keyRom, overdrive) {
+		var index;
 		var bulkTransferInfo = {
 			direction : deviceEndpoints.bulkOut.direction,
 			endpoint : deviceEndpoints.bulkOut.address,
-			data : new Uint8Array(keyRom.reverse()).buffer
+			data : new Uint8Array(0).buffer
 		};
+		
+		if (typeof match !== 'undefined' && match) {
+			bulkTransferInfo.data = new Uint8Array(keyRom.reverse()).buffer;
+			if (typeof overdrive !== 'undefined' && overdrive) {
+				index = 0x0069;
+			} else {
+				index = 0x0055;
+			}
+		} else {
+			if (typeof overdrive !== 'undefined' && overdrive) {
+				index = 0x003C;
+			} else {
+				index = 0x00CC;
+			}
+		}
 
 		var controlTransferInfo = {
 			direction : 'out',
@@ -377,7 +393,7 @@ module.exports = function (ow) {
 			requestType : 'vendor',
 			request : 0x01,
 			value : 0x0065,
-			index : 0x0055,
+			index : index,
 			data : new Uint8Array(0).buffer,
 			timeout : 0
 		};
@@ -386,6 +402,30 @@ module.exports = function (ow) {
 		.then(function () {
 			return ow.controlTransfer(controlTransferInfo);
 		});
+	};
+
+	/*****************************************
+	 *	Key ROM Match
+	 *****************************************/
+
+	ow.keyRomMatch = function (keyRom) {
+		return ow.keyRomCommand(true, keyRom, false);
+	};
+
+	ow.keyRomMatchOverdrive = function (keyRom) {
+		return ow.keyRomCommand(true, keyRom, true);
+	};
+
+	/*****************************************
+	 *	Key ROM Skip
+	 *****************************************/
+
+	ow.keyRomSkip = function () {
+		return ow.keyRomCommand(false, null, false);
+	};
+
+	ow.keyRomSkipOverdrive = function () {
+		return ow.keyRomCommand(false, null, true);
 	};
 
 	/*****************************************
