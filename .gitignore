@@ -35,7 +35,6 @@ Thumbs.db
 *~
 *.sass-cache
 
-# Ignore files with source and sample data #
-############################################
-echip-source/
-sample-data/
+# Project specific files and directories #
+##########################################
+node_modules/
