@@ -1,31 +1,33 @@
 {
-  "name": "1-wire-js",
-  "version": "0.0.1",
-  "description": "Test app for 1-Wire USB interface",
-  "main": "ow.js",
-  "scripts": {
-    "build": "gulp",
-    "watch": "gulp watch"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/KeiserCorp/1-Wire-JS.git"
-  },
-  "author": "Zachary Cardoza",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/KeiserCorp/1-Wire-JS/issues"
-  },
-  "homepage": "https://github.com/KeiserCorp/1-Wire-JS#readme",
-  "devDependencies": {
-    "browserify": "^12.0.1",
-    "crc": "^3.3.0",
-    "gulp": "^3.9.0",
-    "gulp-rename": "^1.2.2",
-    "gulp-streamify": "^1.0.2",
-    "gulp-uglify": "^1.5.1",
-    "gulp-watch": "^4.3.5",
-    "q": "^1.4.1",
-    "vinyl-source-stream": "^1.1.0"
-  }
+	"name" : "1-wire-js",
+	"version" : "0.0.1",
+	"description" : "Test app for 1-Wire USB interface",
+	"main" : "ow.js",
+	"scripts" : {
+		"build" : "gulp",
+		"watch" : "gulp watch"
+	},
+	"repository" : {
+		"type" : "git",
+		"url" : "git+https://github.com/KeiserCorp/1-Wire-JS.git"
+	},
+	"author" : "Zachary Cardoza",
+	"license" : "ISC",
+	"bugs" : {
+		"url" : "https://github.com/KeiserCorp/1-Wire-JS/issues"
+	},
+	"homepage" : "https://github.com/KeiserCorp/1-Wire-JS#readme",
+	"dependencies" : {
+		"q" : "^1.4.1",
+		"crc" : "^3.3.0"
+	},
+	"devDependencies" : {
+		"browserify" : "^12.0.1",
+		"gulp" : "^3.9.0",
+		"gulp-rename" : "^1.2.2",
+		"gulp-streamify" : "^1.0.2",
+		"gulp-uglify" : "^1.5.1",
+		"gulp-watch" : "^4.3.5",
+		"vinyl-source-stream" : "^1.1.0"
+	}
 }
