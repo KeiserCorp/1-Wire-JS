@@ -157,21 +157,87 @@ module.exports = function (ow) {
 		var transferInfo = {
 			direction : deviceEndpoints.interrupt.direction,
 			endpoint : deviceEndpoints.interrupt.address,
-			length : 0x12 // 18
+			length : 0x20, // 32
+			timeout : TRANSACTION_TIMEOUT
 		};
 
 		chrome.usb.interruptTransfer(deviceConnection, transferInfo, function (result) {
 			if (!result.resultCode) {
-				deferred.resolve(parseInterruptResponse(result.data));
+				deferred.resolve(parseStateRegisters(result.data));
 			} else {
-				deferred.reject(result);
+				deferred.reject(chrome.runtime.lastError);
 			}
 		});
 
 		return deferred.promise;
 	};
 
-	var parseInterruptResponse = function (responseBuffer) {
+	/*****************************************
+	 *	Device Control Transfer
+	 *****************************************/
+
+	ow.controlTransfer = function (transferInfo) {
+		var deferred = Q.defer();
+
+		transferInfo.timeout = TRANSACTION_TIMEOUT;
+		chrome.usb.controlTransfer(deviceConnection, transferInfo, function (result) {
+			if (!result.resultCode) {
+				deferred.resolve(result);
+			} else {
+				deferred.reject(chrome.runtime.lastError);
+			}
+		});
+
+		return deferred.promise;
+	};
+
+	/*****************************************
+	 *	Device Bulk Transfer
+	 *****************************************/
+
+	ow.bulkTransfer = function (transferInfo) {
+		var deferred = Q.defer();
+
+		transferInfo.timeout = TRANSACTION_TIMEOUT;
+		chrome.usb.bulkTransfer(deviceConnection, transferInfo, function (result) {
+			if (!result.resultCode) {
+				deferred.resolve(result);
+			} else {
+				deferred.reject(chrome.runtime.lastError);
+			}
+		});
+
+		return deferred.promise;
+	};
+
+	/*****************************************
+	 *	Device Reset
+	 *****************************************/
+
+	ow.deviceReset = function () {
+		var transferInfo = {
+			direction : 'out',
+			recipient : 'device',
+			requestType : 'vendor',
+			request : 0x00,
+			value : 0x0000,
+			index : 0x0000,
+			data : new Uint8Array(0).buffer
+		};
+		return ow.controlTransfer(transferInfo)
+		.then(ow.wireDetectShort)
+		.then(function (shorted) {
+			if (shorted) {
+				throw new Error("Reset Failed: Short Detected");
+			}
+		});
+	};
+
+	/*****************************************
+	 *	Parse State Registers
+	 *****************************************/
+
+	var parseStateRegisters = function (responseBuffer) {
 		var responseArray = new Uint8Array(responseBuffer);
 		var stateRegisters = {};
 
@@ -205,47 +271,46 @@ module.exports = function (ow) {
 				stateRegisters.ResultRegisters.SH = (responseArray[17] >> 1) & 0x01;
 				stateRegisters.ResultRegisters.NRS = responseArray[17] & 0x01;
 			}
+			stateRegisters.ResultRegisters.Data = responseArray.slice(16, responseArray.length);
 		}
 
 		return stateRegisters;
 	};
 
 	/*****************************************
-	 *	Device Control Transfer
+	 *	1-Wire Get Status
 	 *****************************************/
 
-	ow.controlTransfer = function (transferInfo) {
-		var deferred = Q.defer();
-
-		chrome.usb.controlTransfer(deviceConnection, transferInfo, function (result) {
-			if (!result.resultCode) {
-				deferred.resolve(result);
-			} else {
-				console.log('Control Transfer Failed');
-				deferred.reject(result);
-			}
+	ow.deviceGetStatus = function () {
+		var transferInfo = {
+			direction : deviceEndpoints.interrupt.direction,
+			endpoint : deviceEndpoints.interrupt.address,
+			length : 0x20 // 32
+		};
+		return ow.bulkTransfer(transferInfo).then(function (result) {
+			return parseStateRegisters(result.data);
 		});
-
-		return deferred.promise;
 	};
 
 	/*****************************************
-	 *	Device Bulk Transfer
+	 *	1-Wire Detect Short
 	 *****************************************/
 
-	ow.bulkTransfer = function (transferInfo) {
-		var deferred = Q.defer();
-
-		chrome.usb.bulkTransfer(deviceConnection, transferInfo, function (result) {
-			if (!result.resultCode) {
-				deferred.resolve(result);
-			} else {
-				console.log('Bulk Transfer Failed');
-				deferred.reject(result);
+	ow.wireDetectShort = function () {
+		return ow.deviceGetStatus().then(function (status) {
+			if (status.CommCommandBufferStatus !== 0) {
+				return true;
 			}
-		});
 
-		return deferred.promise;
+			if (
+				status.ResultRegisters &&
+				!status.ResultRegisters.DetectKey &&
+				status.ResultRegisters.Data[0] & 0x01 === 1) {
+				return true;
+			}
+
+			return false;
+		});
 	};
 
 	/*****************************************
@@ -261,8 +326,7 @@ module.exports = function (ow) {
 			request : 0x02,
 			value : 0x0002,
 			index : index,
-			data : new Uint8Array(0).buffer,
-			timeout : TRANSACTION_TIMEOUT
+			data : new Uint8Array(0).buffer
 		};
 		return ow.controlTransfer(transferInfo);
 	};
@@ -279,26 +343,27 @@ module.exports = function (ow) {
 			request : 0x01,
 			value : 0x0C4B,
 			index : 0x0001,
-			data : new Uint8Array(0).buffer,
-			timeout : TRANSACTION_TIMEOUT
+			data : new Uint8Array(0).buffer
 		};
 
-		return ow.controlTransfer(transferInfo);
-	};
-
-	ow.wireResetOverdrive = function () {
-		var transferInfo = {
-			direction : 'out',
-			recipient : 'device',
-			requestType : 'vendor',
-			request : 0x01,
-			value : 0x0C4B,
-			index : 0x0002,
-			data : new Uint8Array(0).buffer,
-			timeout : TRANSACTION_TIMEOUT
-		};
-
-		return ow.controlTransfer(transferInfo);
+		return ow.controlTransfer(transferInfo)
+		.then(function () {
+			var deferred = Q.defer();
+			setTimeout(function () {
+				ow.wireDetectShort().then(function (shorted) {
+					if (shorted) {
+						deferred.reject();
+					} else {
+						deferred.resolve();
+					}
+				});
+			}, 5);
+			return deferred.promise;
+		}).fail(function () {
+			return ow.deviceReset();
+		}).fail(function () {
+			throw new Error("Reset Failed: Unrecoverable short detected");
+		});
 	};
 
 	/*****************************************
@@ -341,8 +406,7 @@ module.exports = function (ow) {
 			request : 0x01,
 			value : 0x221 | (bit << 3),
 			index : 0x00,
-			data : new Uint8Array(0).buffer,
-			timeout : TRANSACTION_TIMEOUT
+			data : new Uint8Array(0).buffer
 		};
 
 		return ow.controlTransfer(transferInfo);
@@ -377,8 +441,7 @@ module.exports = function (ow) {
 			request : 0x01,
 			value : 0x29,
 			index : 0x00,
-			data : new Uint8Array(0).buffer,
-			timeout : TRANSACTION_TIMEOUT
+			data : new Uint8Array(0).buffer
 		};
 
 		return ow.controlTransfer(transferInfo)
@@ -412,7 +475,7 @@ module.exports = function (ow) {
 		};
 
 		if (typeof match !== 'undefined' && match) {
-			bulkTransferInfo.data = new Uint8Array(keyRom.reverse()).buffer;
+			bulkTransferInfo.data = new Uint8Array(keyRom).buffer;
 			if (overdrive) {
 				index = 0x0069;
 			} else {
@@ -433,8 +496,7 @@ module.exports = function (ow) {
 			request : 0x01,
 			value : 0x0065,
 			index : index,
-			data : new Uint8Array(0).buffer,
-			timeout : TRANSACTION_TIMEOUT
+			data : new Uint8Array(0).buffer
 		};
 
 		return ow.controlTransfer(controlTransferInfo)
@@ -486,7 +548,7 @@ module.exports = function (ow) {
 		romSearch(parameters).then(function (results) {
 			lastSearchParameters = results;
 			if (results.keys && results.keys[0]) {
-				var key = results.keys[0].reverse();
+				var key = results.keys[0];
 				key.toHexString = function () {
 					return keyRomToHexString(this);
 				};
@@ -527,7 +589,8 @@ module.exports = function (ow) {
 			lastDiscrepancy : parameters.lastDiscrepancy
 		};
 
-		return ow.wireReset()
+		return ow.wireSetSpeed(false)
+		.then(ow.wireReset)
 		.then(function () {
 			return ow.wireWrite(new Uint8Array([0xF0]));
 		}).then(ow.wireClearByte)
@@ -625,12 +688,6 @@ module.exports = function (ow) {
 		.then(ow.wireClearByte)
 		.then(function () {
 			return keyReadMemory();
-		}).then(function (data) {
-			return ow.wireReset().then(function () {
-				return ow.wireSetSpeed(false);
-			}).then(function () {
-				return data;
-			});
 		});
 	};
 
@@ -646,7 +703,6 @@ module.exports = function (ow) {
 		for (var x = 0; x < buffer.length; x++) {
 			buffer[x] = 0xFF;
 		}
-		//console.log('Page: ' + pageIndex);
 		return ow.wireWrite(buffer)
 		.then(function () {
 			return keyReadPage(memory[pageIndex]);
@@ -662,7 +718,7 @@ module.exports = function (ow) {
 		if (typeof index == 'undefined') {
 			var index = 0;
 		}
-		return ow.wireRead((OverdriveEnabled) ? 16 : 1)
+		return ow.wireRead(16)
 		.then(function (result) {
 			result.forEach(function (entry) {
 				page[index++] = entry;
@@ -676,10 +732,11 @@ module.exports = function (ow) {
 	/*****************************************
 	 *	Key ROM Bytes to Hex String
 	 *****************************************/
-	var keyRomToHexString = function (data) {
+	var keyRomToHexString = function (key) {
 		const hexChar = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
 		var string = '';
-		data.map(function (dataByte) {
+		var clonedKey = Array.prototype.slice.call(key);
+		clonedKey.reverse().map(function (dataByte) {
 			string += hexChar[(dataByte >> 4) & 0x0f] + hexChar[dataByte & 0x0f];
 		});
 		return string;
