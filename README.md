@@ -1,8 +1,8 @@
-1-Wire for Javascript
+1-Wire® for Javascript
 ========================
 
 ## Project
-1-Wire Communication implemented in Javascript for Chrome
+1-Wire® Communication implemented in Javascript for Chrome
 
 ## Contributors
 * [bayssmekanique](https://github.com/bayssmekanique)
