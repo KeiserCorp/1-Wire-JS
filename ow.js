@@ -11,7 +11,7 @@ module.exports = function (ow) {
 		return crc.crc81wire(value);
 	}
 
-	const TRANSACTION_TIMEOUT = 10;
+	const TRANSACTION_TIMEOUT = 100;
 	var OverdriveEnabled = false;
 
 	/*****************************************

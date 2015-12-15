@@ -13,6 +13,13 @@ var memoryElement = document.getElementById("memoryDisplay");
 var readMemoryButton = document.getElementById("readMemory");
 var writeMemoryButton = document.getElementById("writeMemory");
 
+var clearMemorySection = function () {
+	memorySection.style.display = 'none';
+	memoryElement.value = '';
+	readMemoryButton.disabled = false;
+	writeMemoryButton.disabled = false;
+};
+
 var masterRom;
 
 window.onload = function () {
@@ -59,6 +66,7 @@ var deviceRemoved = function () {
 	deviceElement.innerText = 'Device: Not Found';
 	keyElement.innerText = 'Key:';
 	romElement.innerText = 'ID:';
+	clearMemorySection();
 };
 
 var deviceOpened = function () {
@@ -93,8 +101,7 @@ var awaitKey = function () {
 		} else {
 			keyElement.innerText = 'Key: Disconnected';
 			romElement.innerText = 'ID:';
-			memorySection.style.display = 'none';
-			memoryElement.value = '';
+			clearMemorySection();
 			awaitKey();
 		}
 	};
@@ -142,7 +149,7 @@ var getKeyMemory = function (keyRom, retry) {
 	var start = performance.now();
 	var finish;
 	console.log('Beginning Memory Read');
-	return ow.keyReadAll(keyRom, true)
+	return ow.keyReadAll(keyRom, !retry)
 	.then(function (data) {
 		finish = performance.now();
 		console.log('Overdrive Memory Read: ' + ((finish - start) / 1000).toFixed(2) + 's');
@@ -154,7 +161,7 @@ var getKeyMemory = function (keyRom, retry) {
 		} else {
 			console.log('Memory Read Error: Retrying');
 			return ow.deviceReset()
-			.then(function (keyRom) {
+			.then(function () {
 				return getKeyMemory(keyRom, true);
 			});
 		}
@@ -165,7 +172,7 @@ var updateKeyMemoryDisplay = function (data) {
 	var display = '';
 	data.forEach(function (row) {
 		row.forEach(function (column) {
-			display += ('00' + column.toString(16)).substr(-2) + ' ';
+			display += ('00' + column.toString(16)).substr(-2).toUpperCase() + ' ';
 		});
 		display += '\n';
 	});
