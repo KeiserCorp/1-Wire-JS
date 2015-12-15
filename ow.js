@@ -2,10 +2,7 @@ module.exports = function (ow) {
 	'use strict';
 	var Q = require('q');
 	var crc = require('crc');
-
-	if (typeof ow === 'undefined') {
-		var ow = {};
-	}
+	var ow = (ow || {});
 
 	var crc8 = function (value) {
 		return crc.crc81wire(value);
@@ -351,7 +348,7 @@ module.exports = function (ow) {
 	 *****************************************/
 
 	ow.wireSetSpeed = function (overdrive) {
-		var index = (typeof overdrive !== 'undefined' && overdrive) ? 0x0002 : 0x0001;
+		var index = (overdrive) ? 0x0002 : 0x0001;
 		var transferInfo = {
 			direction : 'out',
 			recipient : 'device',
@@ -500,14 +497,14 @@ module.exports = function (ow) {
 
 	ow.keyRomCommand = function (match, keyRom, overdrive) {
 		var index;
-		overdrive = (typeof overdrive !== 'undefined' && overdrive);
+		var overdrive = (overdrive || false);
 		var bulkTransferInfo = {
 			direction : deviceEndpoints.bulkOut.direction,
 			endpoint : deviceEndpoints.bulkOut.address,
 			data : new Uint8Array(8).buffer
 		};
 
-		if (typeof match !== 'undefined' && match) {
+		if (match) {
 			bulkTransferInfo.data = new Uint8Array(keyRom).buffer;
 			if (overdrive) {
 				index = 0x0069;
@@ -707,7 +704,7 @@ module.exports = function (ow) {
 		return ow.wireSetSpeed(false)
 		.then(ow.wireReset)
 		.then(function () {
-			if (typeof overdrive !== 'undefined' && overdrive) {
+			if (overdrive) {
 				return ow.keyRomMatchOverdrive(keyRom);
 			} else {
 				return ow.keyRomMatch(keyRom);
@@ -725,12 +722,8 @@ module.exports = function (ow) {
 	};
 
 	var keyReadMemory = function (memory, pageIndex) {
-		if (typeof pageIndex === 'undefined') {
-			var pageIndex = 0;
-		}
-		if (typeof memory === 'undefined') {
-			var memory = new Array(256);
-		}
+		var pageIndex = (pageIndex || 0);
+		var memory = (memory || new Array(256));
 		memory[pageIndex] = new Uint8Array(32);
 		var buffer = new Uint8Array(32);
 		for (var x = 0; x < buffer.length; x++) {
@@ -748,10 +741,8 @@ module.exports = function (ow) {
 	}
 
 	var keyReadPage = function (page, index) {
-		if (typeof index == 'undefined') {
-			var index = 0;
-		}
-		return ow.wireRead(1)
+		var index = (index || 0);
+		return ow.wireRead(16)
 		.then(function (result) {
 			result.forEach(function (entry) {
 				page[index++] = entry;
