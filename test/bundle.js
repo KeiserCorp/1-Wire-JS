@@ -5148,6 +5148,7 @@ var getKeyMemory = function (keyRom, retry) {
 		updateKeyMemoryDisplay(data);
 		readMemoryButton.disabled = false;
 	}).fail(function (error) {
+		console.log(error);
 		if (retry) {
 			console.log('Memory Read Error: Read Cancelled');
 		} else {
