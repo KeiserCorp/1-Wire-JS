@@ -751,7 +751,7 @@ module.exports = function (ow) {
 		if (typeof index == 'undefined') {
 			var index = 0;
 		}
-		return ow.wireRead(16)
+		return ow.wireRead(1)
 		.then(function (result) {
 			result.forEach(function (entry) {
 				page[index++] = entry;

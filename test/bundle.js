@@ -4962,7 +4962,7 @@ module.exports = function (ow) {
 		if (typeof index == 'undefined') {
 			var index = 0;
 		}
-		return ow.wireRead(16)
+		return ow.wireRead(1)
 		.then(function (result) {
 			result.forEach(function (entry) {
 				page[index++] = entry;
@@ -5148,11 +5148,10 @@ var getKeyMemory = function (keyRom, retry) {
 		updateKeyMemoryDisplay(data);
 		readMemoryButton.disabled = false;
 	}).fail(function (error) {
-		console.log(error);
 		if (retry) {
-			console.log('Memory Read Error: Read Cancelled');
+			console.log('Memory Read Error: ' + error.message + ' [Cancelled]');
 		} else {
-			console.log('Memory Read Error: Retrying');
+			console.log('Memory Read Error: ' + error.message + ' [Retrying]');
 			return ow.deviceReset()
 			.then(function () {
 				return getKeyMemory(keyRom, true);
