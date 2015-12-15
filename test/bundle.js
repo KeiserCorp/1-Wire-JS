@@ -5000,14 +5000,29 @@ var deviceElement = document.getElementById("device");
 var keyElement = document.getElementById("key");
 var romElement = document.getElementById("rom");
 
+var memorySection = document.getElementById("memorySection");
+var memoryElement = document.getElementById("memoryDisplay");
+var readMemoryButton = document.getElementById("readMemory");
+var writeMemoryButton = document.getElementById("writeMemory");
+
+var masterRom;
+
 window.onload = function () {
 	ow.checkPermission().then(gotPermission);
 	requestButton.addEventListener('click', function () {
 		ow.requestPermission().then(gotPermission, failedPermission);
 	});
-	
+
 	ow.onDeviceAdded.addListener(deviceConnected);
 	ow.onDeviceRemoved.addListener(deviceRemoved)
+
+	readMemoryButton.addEventListener('click', function () {
+		readMemoryButton.disabled = true;
+		memoryElement.value = '';
+		keyMonitor.add(function () {
+			return getKeyMemory(masterRom);
+		});
+	});
 };
 
 var gotPermission = function () {
@@ -5025,14 +5040,14 @@ var failedPermission = function () {
 
 var awaitDevice = function () {
 	deviceRemoved();
-	ow.openDevice().then(deviceOpened, function(e){console.log(e);});
-};
-
-var deviceConnected = function(device){
 	ow.openDevice().then(deviceOpened);
 };
 
-var deviceRemoved = function(){
+var deviceConnected = function (device) {
+	ow.openDevice().then(deviceOpened);
+};
+
+var deviceRemoved = function () {
 	deviceElement.innerText = 'Device: Not Found';
 	keyElement.innerText = 'Key:';
 	romElement.innerText = 'ID:';
@@ -5041,15 +5056,18 @@ var deviceRemoved = function(){
 var deviceOpened = function () {
 	deviceElement.innerText = 'Device: Found';
 	keyElement.innerText = 'Key: Disconnected';
-	getKeyRom();
+	ow.deviceReset().then(getKeyRom);
 };
 
 var getKeyRom = function () {
 	return ow.keySearchFirst()
 	.then(function (rom) {
 		if (rom[0] === 0x0C) {
-			document.querySelector('#key').innerText = 'Key: Connected';
-			document.querySelector('#rom').innerText = 'ID: ' + rom.toHexString();
+			keyElement.innerText = 'Key: Connected';
+			romElement.innerText = 'ID: ' + rom.toHexString();
+			memorySection.style.display = 'block';
+			masterRom = rom;
+			monitorKey();
 		} else {
 			awaitKey();
 		}
@@ -5057,17 +5075,18 @@ var getKeyRom = function () {
 };
 
 var awaitKey = function () {
-	console.log('awaiting key');
 	var interruptTimeout = function (result) {
 		if (result.ResultRegisters && result.ResultRegisters.DetectKey) {
-			document.querySelector('#key').innerText = 'Key: Detected';
+			keyElement.innerText = 'Key: Detected';
 			getKeyRom()
 			.fail(function () {
 				awaitKey();
 			});
 		} else {
-			document.querySelector('#key').innerText = 'Key: Disconnected';
-			document.querySelector('#rom').innerText = 'ID:';
+			keyElement.innerText = 'Key: Disconnected';
+			romElement.innerText = 'ID:';
+			memorySection.style.display = 'none';
+			memoryElement.value = '';
 			awaitKey();
 		}
 	};
@@ -5078,6 +5097,71 @@ var awaitKey = function () {
 			awaitKey();
 		});
 	}, 500);
+};
+
+var KeyMonitorController = function () {
+	this.commands = [];
+};
+
+KeyMonitorController.prototype = {
+	add : function (fn) {
+		this.commands.push(fn);
+	},
+	runNext : function (nextCommand) {
+		var fn = this.commands.shift();
+		if (fn) {
+			return fn.call().then(nextCommand);
+		}
+		return nextCommand.call();
+	}
+}
+
+var keyMonitor = new KeyMonitorController();
+
+var monitorKey = function () {
+	setTimeout(function () {
+		ow.keySearchFirst().then(function (rom) {
+			if (rom.toHexString() === masterRom.toHexString()) {
+				keyMonitor.runNext(monitorKey);
+			} else {
+				awaitKey();
+			}
+		}, awaitKey);
+	}, 500);
+};
+
+var getKeyMemory = function (keyRom, retry) {
+	var start = performance.now();
+	var finish;
+	console.log('Beginning Memory Read');
+	return ow.keyReadAll(keyRom, true)
+	.then(function (data) {
+		finish = performance.now();
+		console.log('Overdrive Memory Read: ' + ((finish - start) / 1000).toFixed(2) + 's');
+		updateKeyMemoryDisplay(data);
+		readMemoryButton.disabled = false;
+	}).fail(function (error) {
+		if (retry) {
+			console.log('Memory Read Error: Read Cancelled');
+		} else {
+			console.log('Memory Read Error: Retrying');
+			return ow.deviceReset()
+			.then(function (keyRom) {
+				return getKeyMemory(keyRom, true);
+			});
+		}
+	});
+};
+
+var updateKeyMemoryDisplay = function (data) {
+	var display = '';
+	data.forEach(function (row) {
+		row.forEach(function (column) {
+			display += ('00' + column.toString(16)).substr(-2) + ' ';
+		});
+		display += '\n';
+	});
+	memoryElement.value = display;
 };
 
 },{"../ow.js":18}]},{},[19]);
