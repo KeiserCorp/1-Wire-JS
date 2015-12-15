@@ -15,8 +15,8 @@ module.exports = function (ow) {
 	 *	Chrome Permissions
 	 *****************************************/
 
-	const DALLAS_VENDOR_ID = 1274; //0x04FA;
-	const DALLAS_PRODUCT_ID = 9360; //0x2490;
+	const DALLAS_VENDOR_ID = 0x04FA;
+	const DALLAS_PRODUCT_ID = 0x2490;
 	const DEVICE_INFO = {
 		'vendorId' : DALLAS_VENDOR_ID,
 		'productId' : DALLAS_PRODUCT_ID
@@ -187,7 +187,7 @@ module.exports = function (ow) {
 		var transferInfo = {
 			direction : deviceEndpoints.interrupt.direction,
 			endpoint : deviceEndpoints.interrupt.address,
-			length : 0x20, // 32
+			length : 0x20,
 			timeout : TRANSACTION_TIMEOUT
 		};
 
@@ -315,7 +315,7 @@ module.exports = function (ow) {
 		var transferInfo = {
 			direction : deviceEndpoints.interrupt.direction,
 			endpoint : deviceEndpoints.interrupt.address,
-			length : 0x20 // 32
+			length : 0x20
 		};
 		return ow.bulkTransfer(transferInfo).then(function (result) {
 			return parseStateRegisters(result.data);
