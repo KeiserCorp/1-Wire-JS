@@ -111,9 +111,42 @@ module.exports = function (ow) {
 			}
 		});
 	};
+	
+	/*****************************************
+	 *	Device Added Monitoring
+	 *****************************************/
+
+	var DeviceAddedEvent = function () {
+		this.handlers = [];
+	};
+
+	DeviceAddedEvent.prototype = {
+		addListener : function (fn) {
+			this.handlers.push(fn);
+		},
+		addedListener : function (fn) {
+			this.handlers = this.handlers.filter(function (item) {
+					if (item !== fn) {
+						return item;
+					}
+				});
+		},
+		dispatch : function (o, thisObj) {
+			var scope = thisObj;
+			this.handlers.forEach(function (item) {
+				item.call(scope, o);
+			});
+		}
+	}
+
+	ow.onDeviceAdded = new DeviceAddedEvent();
+
+	chrome.usb.onDeviceAdded.addListener(function () {
+		ow.onDeviceAdded.dispatch();
+	});
 
 	/*****************************************
-	 *	Device Monitoring
+	 *	Device Removed Monitoring
 	 *****************************************/
 
 	var DeviceRemovedEvent = function () {

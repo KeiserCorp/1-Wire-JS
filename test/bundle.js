@@ -4322,9 +4322,42 @@ module.exports = function (ow) {
 			}
 		});
 	};
+	
+	/*****************************************
+	 *	Device Added Monitoring
+	 *****************************************/
+
+	var DeviceAddedEvent = function () {
+		this.handlers = [];
+	};
+
+	DeviceAddedEvent.prototype = {
+		addListener : function (fn) {
+			this.handlers.push(fn);
+		},
+		addedListener : function (fn) {
+			this.handlers = this.handlers.filter(function (item) {
+					if (item !== fn) {
+						return item;
+					}
+				});
+		},
+		dispatch : function (o, thisObj) {
+			var scope = thisObj;
+			this.handlers.forEach(function (item) {
+				item.call(scope, o);
+			});
+		}
+	}
+
+	ow.onDeviceAdded = new DeviceAddedEvent();
+
+	chrome.usb.onDeviceAdded.addListener(function () {
+		ow.onDeviceAdded.dispatch();
+	});
 
 	/*****************************************
-	 *	Device Monitoring
+	 *	Device Removed Monitoring
 	 *****************************************/
 
 	var DeviceRemovedEvent = function () {
@@ -4961,46 +4994,74 @@ module.exports = function (ow) {
 var oneWire = require('../ow.js');
 var ow = oneWire();
 
+var requestButton = document.getElementById("requestPermission");
+var permissionElement = document.getElementById("permission");
+var deviceElement = document.getElementById("device");
+var keyElement = document.getElementById("key");
+var romElement = document.getElementById("rom");
+
+window.onload = function () {
+	ow.checkPermission().then(gotPermission);
+	requestButton.addEventListener('click', function () {
+		ow.requestPermission().then(gotPermission, failedPermission);
+	});
+	
+	ow.onDeviceAdded.addListener(deviceConnected);
+	ow.onDeviceRemoved.addListener(deviceRemoved)
+};
+
 var gotPermission = function () {
 	requestButton.style.display = 'none';
-	document.querySelector('#permission').innerText = 'Permission: Granted';
+	permissionElement.innerText = 'Permission: Granted';
 	console.log('App was granted the "usbDevices" permission.');
-	awaitDevice()
-	.fail(function (error) {
-		console.log(error);
-	});
+	awaitDevice();
 };
 
 var failedPermission = function () {
-	document.querySelector('#permission').innerText = 'Permission: Failed';
+	permissionElement.innerText = 'Permission: Failed';
 	console.log('App was not granted the "usbDevices" permission.');
 	console.log(chrome.runtime.lastError);
 };
 
 var awaitDevice = function () {
-	var deviceSearchTimeout = function () {
-		chrome.usb.onDeviceAdded.addListener(function () {
-			ow.openDevice().then(deviceFound);
-		});
-	};
-	document.querySelector('#device').innerText = 'Device: Not Found';
-	document.querySelector('#key').innerText = 'Key: Disconnected';
-	document.querySelector('#rom').innerText = 'ID:';
-	return ow.openDevice().then(deviceFound, deviceSearchTimeout);
+	deviceRemoved();
+	ow.openDevice().then(deviceOpened, function(e){console.log(e);});
 };
 
-var deviceFound = function () {
-	document.querySelector('#device').innerText = 'Device: Found';
-	ow.onDeviceRemoved.addListener(awaitDevice)
-	return awaitKey();
+var deviceConnected = function(device){
+	ow.openDevice().then(deviceOpened);
+};
+
+var deviceRemoved = function(){
+	deviceElement.innerText = 'Device: Not Found';
+	keyElement.innerText = 'Key:';
+	romElement.innerText = 'ID:';
+};
+
+var deviceOpened = function () {
+	deviceElement.innerText = 'Device: Found';
+	keyElement.innerText = 'Key: Disconnected';
+	getKeyRom();
+};
+
+var getKeyRom = function () {
+	return ow.keySearchFirst()
+	.then(function (rom) {
+		if (rom[0] === 0x0C) {
+			document.querySelector('#key').innerText = 'Key: Connected';
+			document.querySelector('#rom').innerText = 'ID: ' + rom.toHexString();
+		} else {
+			awaitKey();
+		}
+	}, awaitKey);
 };
 
 var awaitKey = function () {
+	console.log('awaiting key');
 	var interruptTimeout = function (result) {
 		if (result.ResultRegisters && result.ResultRegisters.DetectKey) {
 			document.querySelector('#key').innerText = 'Key: Detected';
 			getKeyRom()
-			.then(awaitKey)
 			.fail(function () {
 				awaitKey();
 			});
@@ -5017,61 +5078,6 @@ var awaitKey = function () {
 			awaitKey();
 		});
 	}, 500);
-};
-
-var getKeyRom = function () {
-	return ow.keySearchFirst()
-	.then(function (rom) {
-		if (rom[0] === 0x0C) {
-			document.querySelector('#key').innerText = 'Key: Connected';
-			document.querySelector('#rom').innerText = 'ID: ' + rom.toHexString();
-			return getKeyMemory(rom);
-		}
-		awaitKey();
-	});
-};
-
-var getKeyMemory = function (keyRom) {
-	var start = performance.now();
-	var finish;
-	console.log('Beginning Memory Flush');
-	return ow.keyReadAll(keyRom)
-	.then(function (data) {
-		finish = performance.now();
-		console.log('Standard Memory Flush: ' + ((finish - start) / 1000).toFixed(2) + 's');
-		console.log(data);
-	}).then(function () {
-		start = performance.now();
-		return ow.keyReadAll(keyRom, true);
-	}).then(function (data) {
-		finish = performance.now();
-		console.log('Overdrive Memory Flush: ' + ((finish - start) / 1000).toFixed(2) + 's');
-		console.log(data);
-	}).fail(function (error) {
-		return ow.deviceReset()
-		.then(function (keyRom) {
-			return getKeyMemory(keyRom);
-		});
-	});
-};
-
-var monitorConnectionStatus = function (keyRom) {
-	var monitorTimeout = function (result) {
-		console.log(result);
-		monitorConnectionStatus();
-	};
-	setTimeout(function () {
-		ow.deviceGetStatus().then(monitorTimeout);
-	}, 2000);
-};
-
-var requestButton = document.getElementById("requestPermission");
-
-window.onload = function () {
-	ow.checkPermission().then(gotPermission);
-	requestButton.addEventListener('click', function () {
-		ow.requestPermission().then(gotPermission, failedPermission);
-	});
 };
 
 },{"../ow.js":18}]},{},[19]);
