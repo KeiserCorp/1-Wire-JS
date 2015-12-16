@@ -12,12 +12,14 @@ var memorySection = document.getElementById("memorySection");
 var memoryElement = document.getElementById("memoryDisplay");
 var readMemoryButton = document.getElementById("readMemory");
 var writeMemoryButton = document.getElementById("writeMemory");
+var writeRandomMemoryButton = document.getElementById("writeRandomMemory");
 
 var clearMemorySection = function () {
 	memorySection.style.display = 'none';
 	memoryElement.value = '';
 	readMemoryButton.disabled = false;
 	writeMemoryButton.disabled = false;
+	writeRandomMemoryButton.disabled = false;
 };
 
 var masterRom;
@@ -38,6 +40,13 @@ window.onload = function () {
 			return getKeyMemory(masterRom);
 		});
 	});
+
+	writeRandomMemoryButton.addEventListener('click', function () {
+		writeRandomMemoryButton.disabled = true;
+		keyMonitor.add(function () {
+			return pushRandomKeyMemory(masterRom);
+		});
+	});
 };
 
 var gotPermission = function () {
@@ -55,11 +64,11 @@ var failedPermission = function () {
 
 var awaitDevice = function () {
 	deviceRemoved();
-	ow.openDevice().then(deviceOpened);
+	ow.deviceOpen().then(deviceOpened);
 };
 
 var deviceConnected = function (device) {
-	ow.openDevice().then(deviceOpened);
+	ow.deviceOpen().then(deviceOpened);
 };
 
 var deviceRemoved = function () {
@@ -106,7 +115,7 @@ var awaitKey = function () {
 		}
 	};
 	setTimeout(function () {
-		ow.interruptTransfer()
+		ow.deviceInterruptTransfer()
 		.then(interruptTimeout)
 		.fail(function () {
 			awaitKey();
@@ -146,12 +155,11 @@ var monitorKey = function () {
 };
 
 var getKeyMemory = function (keyRom, retry) {
-	var start = performance.now();
-	var finish;
 	console.log('Beginning Memory Read');
+	var start = performance.now();
 	return ow.keyReadAll(keyRom, !retry)
 	.then(function (data) {
-		finish = performance.now();
+		var finish = performance.now();
 		console.log('Overdrive Memory Read: ' + ((finish - start) / 1000).toFixed(2) + 's');
 		updateKeyMemoryDisplay(data);
 		readMemoryButton.disabled = false;
@@ -177,4 +185,21 @@ var updateKeyMemoryDisplay = function (data) {
 		display += '\n';
 	});
 	memoryElement.value = display;
+};
+
+var pushRandomKeyMemory = function (keyRom, retry) {
+	console.log('Beginning Memory Write');
+	var test = new Array(256);
+	for (var x = 0; x < test.length; x++) {
+		test[x] = new Uint8Array(32);
+		for (var y = 0; y < test[x].length; y++) {
+			test[x][y] = Math.floor(Math.random() * (256));
+		}
+	}
+	var start = performance.now();
+	return ow.keyWriteAll(keyRom, test, true).then(function () {
+		var finish = performance.now();
+		console.log('Overdrive Memory Write: ' + ((finish - start) / 1000).toFixed(2) + 's');
+		writeRandomMemoryButton.disabled = false;
+	});
 };

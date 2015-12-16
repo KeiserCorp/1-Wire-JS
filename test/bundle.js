@@ -4219,7 +4219,7 @@ module.exports = function (ow) {
 		return crc.crc81wire(value);
 	}
 
-	const TRANSACTION_TIMEOUT = 100;
+	const TRANSACTION_TIMEOUT = 10;
 	var OverdriveEnabled = false;
 
 	/*****************************************
@@ -4272,7 +4272,7 @@ module.exports = function (ow) {
 	var deviceConnection;
 	var deviceInterface;
 
-	ow.openDevice = function () {
+	ow.deviceOpen = function () {
 		var deferred = Q.defer();
 		chrome.usb.getDevices(DEVICE_INFO, function (devices) {
 			chrome.usb.findDevices(DEVICE_INFO, function (connections) {
@@ -4319,7 +4319,7 @@ module.exports = function (ow) {
 			}
 		});
 	};
-	
+
 	/*****************************************
 	 *	Device Added Monitoring
 	 *****************************************/
@@ -4392,7 +4392,7 @@ module.exports = function (ow) {
 	 *	Device Interrupt Transfer
 	 *****************************************/
 
-	ow.interruptTransfer = function () {
+	ow.deviceInterruptTransfer = function () {
 		var deferred = Q.defer();
 
 		var transferInfo = {
@@ -4417,7 +4417,7 @@ module.exports = function (ow) {
 	 *	Device Control Transfer
 	 *****************************************/
 
-	ow.controlTransfer = function (transferInfo) {
+	ow.deviceControlTransfer = function (transferInfo) {
 		var deferred = Q.defer();
 
 		transferInfo.timeout = TRANSACTION_TIMEOUT;
@@ -4436,7 +4436,7 @@ module.exports = function (ow) {
 	 *	Device Bulk Transfer
 	 *****************************************/
 
-	ow.bulkTransfer = function (transferInfo) {
+	ow.deviceBulkTransfer = function (transferInfo) {
 		var deferred = Q.defer();
 
 		transferInfo.timeout = TRANSACTION_TIMEOUT;
@@ -4465,7 +4465,7 @@ module.exports = function (ow) {
 			index : 0x0000,
 			data : new Uint8Array(0).buffer
 		};
-		return ow.controlTransfer(transferInfo)
+		return ow.deviceControlTransfer(transferInfo)
 		.then(ow.wireDetectShort)
 		.then(function (shorted) {
 			if (shorted) {
@@ -4528,7 +4528,7 @@ module.exports = function (ow) {
 			endpoint : deviceEndpoints.interrupt.address,
 			length : 0x20
 		};
-		return ow.bulkTransfer(transferInfo).then(function (result) {
+		return ow.deviceBulkTransfer(transferInfo).then(function (result) {
 			return parseStateRegisters(result.data);
 		});
 	};
@@ -4569,7 +4569,7 @@ module.exports = function (ow) {
 			index : index,
 			data : new Uint8Array(0).buffer
 		};
-		return ow.controlTransfer(transferInfo);
+		return ow.deviceControlTransfer(transferInfo);
 	};
 
 	/*****************************************
@@ -4587,7 +4587,7 @@ module.exports = function (ow) {
 			data : new Uint8Array(0).buffer
 		};
 
-		return ow.controlTransfer(transferInfo)
+		return ow.deviceControlTransfer(transferInfo)
 		.then(function () {
 			var deferred = Q.defer();
 			setTimeout(function () {
@@ -4629,9 +4629,9 @@ module.exports = function (ow) {
 			timeout : TRANSACTION_TIMEOUT
 		};
 
-		return ow.bulkTransfer(bulkTransferInfo)
+		return ow.deviceBulkTransfer(bulkTransferInfo)
 		.then(function () {
-			return ow.controlTransfer(controlTransferInfo);
+			return ow.deviceControlTransfer(controlTransferInfo);
 		});
 	};
 
@@ -4650,7 +4650,7 @@ module.exports = function (ow) {
 			data : new Uint8Array(0).buffer
 		};
 
-		return ow.controlTransfer(transferInfo);
+		return ow.deviceControlTransfer(transferInfo);
 	};
 
 	/*****************************************
@@ -4664,7 +4664,7 @@ module.exports = function (ow) {
 			length : byteCount
 		};
 
-		return ow.bulkTransfer(transferInfo)
+		return ow.deviceBulkTransfer(transferInfo)
 		.then(function (result) {
 			return new Uint8Array(result.data);
 		});
@@ -4685,7 +4685,7 @@ module.exports = function (ow) {
 			data : new Uint8Array(0).buffer
 		};
 
-		return ow.controlTransfer(transferInfo)
+		return ow.deviceControlTransfer(transferInfo)
 		.then(function (result) {
 			return ow.wireRead(1);
 		})
@@ -4740,12 +4740,12 @@ module.exports = function (ow) {
 			data : new Uint8Array(0).buffer
 		};
 
-		return ow.controlTransfer(controlTransferInfo)
+		return ow.deviceControlTransfer(controlTransferInfo)
 		.then(function () {
 			OverdriveEnabled = overdrive;
 			return ow.wireSetSpeed(overdrive);
 		}).then(function () {
-			return ow.bulkTransfer(bulkTransferInfo)
+			return ow.deviceBulkTransfer(bulkTransferInfo)
 		});
 	};
 
@@ -4965,6 +4965,121 @@ module.exports = function (ow) {
 	};
 
 	/*****************************************
+	 *	Key Write
+	 *****************************************/
+
+	ow.keyWrite = function (keyRom, offset, data, overdrive) {
+		var offset = (offset || 0);
+		var offsetMSB = (offset & 0xFF);
+		var offsetLSB = (offset & 0xFF00) >> 8;
+		var endingOffset = data.length - 1;
+		var data = (data || new Uint8Array(0));
+
+		return ow.wireSetSpeed(false)
+		.then(function () {
+			return writeToScratch(keyRom, offset, data, overdrive);
+		})
+		.then(ow.wireReset)
+		.then(function () {
+			if (overdrive) {
+				return ow.keyRomMatchOverdrive(keyRom);
+			} else {
+				return ow.keyRomMatch(keyRom);
+			}
+		})
+		.then(function () {
+			var command = new Uint8Array([0x55, offsetMSB, offsetLSB, endingOffset]);
+			return ow.wireWrite(command);
+		}).then(ow.wireClearByte)
+		.then(ow.wireClearByte)
+		.then(ow.wireClearByte)
+		.then(ow.wireClearByte)
+	};
+
+	var writeToScratch = function (keyRom, offset, data, overdrive) {
+		var offset = (offset || 0);
+		var offsetMSB = (offset & 0xFF);
+		var offsetLSB = (offset & 0xFF00) >> 8;
+		var endingOffset = data.length - 1;
+		var data = (data || new Uint8Array(0));
+
+		var returnedData;
+
+		return ow.wireReset()
+		.then(function () {
+			if (overdrive) {
+				return ow.keyRomMatchOverdrive(keyRom);
+			} else {
+				return ow.keyRomMatch(keyRom);
+			}
+		})
+		.then(function () {
+			var command = new Uint8Array([0x0F, offsetMSB, offsetLSB]);
+			return ow.wireWrite(command);
+		}).then(ow.wireClearByte)
+		.then(ow.wireClearByte)
+		.then(ow.wireClearByte)
+		.then(function () {
+			return writeData(data, 0);
+		}).then(ow.wireReset)
+		.then(function () {
+			if (overdrive) {
+				return ow.keyRomMatchOverdrive(keyRom);
+			} else {
+				return ow.keyRomMatch(keyRom);
+			}
+		})
+		.then(function () {
+			var command = new Uint8Array([0xAA]);
+			return ow.wireWrite(command);
+		})
+		.then(function () {
+			return ow.wireRead(data.length)
+		}).then(function (data) {
+			returnedData = data;
+		})
+		.then(ow.wireClearByte)
+		.then(function () {
+			if ((returnedData.length == data.length) && returnedData.every(function (element, index) {
+					return element === data[index];
+				})) {
+				return;
+			}
+			return writeToScratch(keyRom, offset, data, overdrive);
+		});
+	};
+
+	var writeData = function (data, offset) {
+		var size = (data.length - offset > 16) ? 16 : data.length - offset;
+		var sendData = new Uint8Array(size);
+		for (var x = 0; x < size; x++) {
+			sendData[x] = data[offset + x];
+		}
+		return ow.wireWrite(sendData).then(function () {
+			if ((data.length - (offset + size)) > 0) {
+				return writeData(data, offset + size);
+			}
+		});
+	};
+
+	/*****************************************
+	 *	Key Write All Data
+	 *****************************************/
+
+	ow.keyWriteAll = function (keyRom, data, overdrive) {
+		return keyWriteAllOffset(keyRom, data, 0, overdrive);
+	};
+
+	var keyWriteAllOffset = function (keyRom, data, page, overdrive) {
+		var offset = page * 32;
+		return ow.keyWrite(keyRom, offset, data[page], overdrive).then(function () {
+			if (data.length > page + 1) {
+				return keyWriteAllOffset(keyRom, data, page + 1, overdrive)
+			}
+		});
+	};
+
+	/*****************************************
 	 *	Key ROM Bytes to Hex String
 	 *****************************************/
 	var keyRomToHexString = function (key) {
@@ -4995,12 +5110,14 @@ var memorySection = document.getElementById("memorySection");
 var memoryElement = document.getElementById("memoryDisplay");
 var readMemoryButton = document.getElementById("readMemory");
 var writeMemoryButton = document.getElementById("writeMemory");
+var writeRandomMemoryButton = document.getElementById("writeRandomMemory");
 
 var clearMemorySection = function () {
 	memorySection.style.display = 'none';
 	memoryElement.value = '';
 	readMemoryButton.disabled = false;
 	writeMemoryButton.disabled = false;
+	writeRandomMemoryButton.disabled = false;
 };
 
 var masterRom;
@@ -5021,6 +5138,13 @@ window.onload = function () {
 			return getKeyMemory(masterRom);
 		});
 	});
+
+	writeRandomMemoryButton.addEventListener('click', function () {
+		writeRandomMemoryButton.disabled = true;
+		keyMonitor.add(function () {
+			return pushRandomKeyMemory(masterRom);
+		});
+	});
 };
 
 var gotPermission = function () {
@@ -5038,11 +5162,11 @@ var failedPermission = function () {
 
 var awaitDevice = function () {
 	deviceRemoved();
-	ow.openDevice().then(deviceOpened);
+	ow.deviceOpen().then(deviceOpened);
 };
 
 var deviceConnected = function (device) {
-	ow.openDevice().then(deviceOpened);
+	ow.deviceOpen().then(deviceOpened);
 };
 
 var deviceRemoved = function () {
@@ -5089,7 +5213,7 @@ var awaitKey = function () {
 		}
 	};
 	setTimeout(function () {
-		ow.interruptTransfer()
+		ow.deviceInterruptTransfer()
 		.then(interruptTimeout)
 		.fail(function () {
 			awaitKey();
@@ -5129,12 +5253,11 @@ var monitorKey = function () {
 };
 
 var getKeyMemory = function (keyRom, retry) {
-	var start = performance.now();
-	var finish;
 	console.log('Beginning Memory Read');
+	var start = performance.now();
 	return ow.keyReadAll(keyRom, !retry)
 	.then(function (data) {
-		finish = performance.now();
+		var finish = performance.now();
 		console.log('Overdrive Memory Read: ' + ((finish - start) / 1000).toFixed(2) + 's');
 		updateKeyMemoryDisplay(data);
 		readMemoryButton.disabled = false;
@@ -5160,6 +5283,23 @@ var updateKeyMemoryDisplay = function (data) {
 		display += '\n';
 	});
 	memoryElement.value = display;
+};
+
+var pushRandomKeyMemory = function (keyRom, retry) {
+	console.log('Beginning Memory Write');
+	var test = new Array(256);
+	for (var x = 0; x < test.length; x++) {
+		test[x] = new Uint8Array(32);
+		for (var y = 0; y < test[x].length; y++) {
+			test[x][y] = Math.floor(Math.random() * (256));
+		}
+	}
+	var start = performance.now();
+	return ow.keyWriteAll(keyRom, test, true).then(function () {
+		var finish = performance.now();
+		console.log('Overdrive Memory Write: ' + ((finish - start) / 1000).toFixed(2) + 's');
+		writeRandomMemoryButton.disabled = false;
+	});
 };
 
 },{"../ow.js":18}]},{},[19]);
