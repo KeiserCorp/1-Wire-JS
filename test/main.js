@@ -13,6 +13,7 @@ var memoryElement = document.getElementById("memoryDisplay");
 var readMemoryButton = document.getElementById("readMemory");
 var writeMemoryButton = document.getElementById("writeMemory");
 var writeRandomMemoryButton = document.getElementById("writeRandomMemory");
+var clearMemoryButton = document.getElementById("clearMemory");
 
 var clearMemorySection = function () {
 	memorySection.style.display = 'none';
@@ -20,9 +21,12 @@ var clearMemorySection = function () {
 	readMemoryButton.disabled = false;
 	writeMemoryButton.disabled = false;
 	writeRandomMemoryButton.disabled = false;
+	clearMemoryButton.disabled = false;
+	masterMemory = new Array(0);
 };
 
 var masterRom;
+var masterMemory = new Array(0);
 
 window.onload = function () {
 	ow.checkPermission().then(gotPermission);
@@ -41,10 +45,26 @@ window.onload = function () {
 		});
 	});
 
+	writeMemoryButton.addEventListener('click', function () {
+		writeMemoryButton.disabled = true;
+		keyMonitor.add(function () {
+			return pushDiffKeyMemory(masterRom);
+		});
+	});
+
 	writeRandomMemoryButton.addEventListener('click', function () {
 		writeRandomMemoryButton.disabled = true;
+		memoryElement.value = '';
 		keyMonitor.add(function () {
 			return pushRandomKeyMemory(masterRom);
+		});
+	});
+
+	clearMemoryButton.addEventListener('click', function () {
+		clearMemoryButton.disabled = true;
+		memoryElement.value = '';
+		keyMonitor.add(function () {
+			return clearKeyMemory(masterRom);
 		});
 	});
 };
@@ -161,6 +181,7 @@ var getKeyMemory = function (keyRom, retry) {
 	.then(function (data) {
 		var finish = performance.now();
 		console.log('Overdrive Memory Read: ' + ((finish - start) / 1000).toFixed(2) + 's');
+		masterMemory = data;
 		updateKeyMemoryDisplay(data);
 		readMemoryButton.disabled = false;
 	}).fail(function (error) {
@@ -187,19 +208,66 @@ var updateKeyMemoryDisplay = function (data) {
 	memoryElement.value = display;
 };
 
-var pushRandomKeyMemory = function (keyRom, retry) {
+var pushDiffKeyMemory = function (keyRom, retry) {
 	console.log('Beginning Memory Write');
-	var test = new Array(256);
-	for (var x = 0; x < test.length; x++) {
-		test[x] = new Uint8Array(32);
-		for (var y = 0; y < test[x].length; y++) {
-			test[x][y] = Math.floor(Math.random() * (256));
+	var rows = memoryElement.value.split('\n');
+	var data = new Array(256);
+	for (var x = 0; x < data.length; x++) {
+		data[x] = new Uint8Array(32);
+		for (var y = 0; y < data[x].length; y++) {
+			data[x][y] = 0x55;
+		}
+		if ((rows[x] || new Array(0)).length > 0) {
+			var tuples = rows[x].split(' ');
+			for (var y = 0; y < tuples.length; y++) {
+				data[x][y] = parseInt('0x' + tuples[y]);
+			}
 		}
 	}
 	var start = performance.now();
-	return ow.keyWriteAll(keyRom, test, true).then(function () {
+	return ow.keyWriteDiff(keyRom, data, masterMemory, true).then(function () {
 		var finish = performance.now();
 		console.log('Overdrive Memory Write: ' + ((finish - start) / 1000).toFixed(2) + 's');
+		writeMemoryButton.disabled = false;
+	});
+};
+
+var pushRandomKeyMemory = function (keyRom, retry) {
+	console.log('Beginning Memory Write');
+	var data = new Array(256);
+	for (var x = 0; x < data.length; x++) {
+		data[x] = new Uint8Array(32);
+		for (var y = 0; y < data[x].length; y++) {
+			data[x][y] = Math.floor(Math.random() * (256));
+		}
+	}
+	var start = performance.now();
+	return ow.keyWriteAll(keyRom, data, true).then(function () {
+		var finish = performance.now();
+		console.log('Overdrive Memory Write: ' + ((finish - start) / 1000).toFixed(2) + 's');
+		keyMonitor.add(function () {
+			return getKeyMemory(keyRom);
+		});
 		writeRandomMemoryButton.disabled = false;
+	});
+};
+
+var clearKeyMemory = function (keyRom, retry) {
+	console.log('Beginning Memory Write');
+	var data = new Array(256);
+	for (var x = 0; x < data.length; x++) {
+		data[x] = new Uint8Array(32);
+		for (var y = 0; y < data[x].length; y++) {
+			data[x][y] = 0x55;
+		}
+	}
+	var start = performance.now();
+	return ow.keyWriteDiff(keyRom, data, masterMemory, true).then(function () {
+		var finish = performance.now();
+		console.log('Overdrive Memory Write: ' + ((finish - start) / 1000).toFixed(2) + 's');
+		keyMonitor.add(function () {
+			return getKeyMemory(keyRom);
+		});
+		clearMemoryButton.disabled = false;
 	});
 };

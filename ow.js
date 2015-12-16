@@ -869,6 +869,35 @@ module.exports = function (ow) {
 	};
 
 	/*****************************************
+	 *	Key Write Diff Data
+	 *****************************************/
+
+	ow.keyWriteDiff = function (keyRom, newData, oldData, overdrive) {
+		if ((oldData || new Array(0)).length < newData.length) {
+			return ow.keyReadAll(keyRom, overdrive).then(function (resultData) {
+				return keyWriteDiffOffset(keyRom, newData, resultData, 0, overdrive);
+			});
+		}
+		return keyWriteDiffOffset(keyRom, newData, oldData, 0, overdrive);
+	};
+
+	var keyWriteDiffOffset = function (keyRom, newData, oldData, page, overdrive) {
+		var offset = page * 32;
+		if ((newData[page].length === oldData[page].length) && newData[page].every(function (element, index) {
+				return element === oldData[page][index];
+			})) {
+			if (newData.length > page + 1) {
+				return keyWriteDiffOffset(keyRom, newData, oldData, page + 1, overdrive)
+			}
+		}
+		return ow.keyWrite(keyRom, offset, newData[page], overdrive).then(function () {
+			if (newData.length > page + 1) {
+				return keyWriteDiffOffset(keyRom, newData, oldData, page + 1, overdrive)
+			}
+		});
+	};
+
+	/*****************************************
 	 *	Key ROM Bytes to Hex String
 	 *****************************************/
 	var keyRomToHexString = function (key) {
