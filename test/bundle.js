@@ -5087,7 +5087,7 @@ module.exports = function (ow) {
 		var string = '';
 		var clonedKey = Array.prototype.slice.call(key);
 		clonedKey.reverse().map(function (dataByte) {
-			string += hexChar[(dataByte >> 4) & 0x0f] + hexChar[dataByte & 0x0f];
+			string += hexChar[(dataByte >> 4) & 0x0F] + hexChar[dataByte & 0x0F];
 		});
 		return string;
 	};
