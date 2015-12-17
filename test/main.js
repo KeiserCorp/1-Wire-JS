@@ -1,19 +1,19 @@
-"use strict";
+'use strict';
 var oneWire = require('../ow.js');
 var ow = oneWire();
 
-var requestButton = document.getElementById("requestPermission");
-var permissionElement = document.getElementById("permission");
-var deviceElement = document.getElementById("device");
-var keyElement = document.getElementById("key");
-var romElement = document.getElementById("rom");
+var requestButton = document.getElementById('requestPermission');
+var permissionElement = document.getElementById('permission');
+var deviceElement = document.getElementById('device');
+var keyElement = document.getElementById('key');
+var romElement = document.getElementById('rom');
 
-var memorySection = document.getElementById("memorySection");
-var memoryElement = document.getElementById("memoryDisplay");
-var readMemoryButton = document.getElementById("readMemory");
-var writeMemoryButton = document.getElementById("writeMemory");
-var writeRandomMemoryButton = document.getElementById("writeRandomMemory");
-var clearMemoryButton = document.getElementById("clearMemory");
+var memorySection = document.getElementById('memorySection');
+var memoryElement = document.getElementById('memoryDisplay');
+var readMemoryButton = document.getElementById('readMemory');
+var writeMemoryButton = document.getElementById('writeMemory');
+var writeRandomMemoryButton = document.getElementById('writeRandomMemory');
+var clearMemoryButton = document.getElementById('clearMemory');
 
 var clearMemorySection = function () {
 	memorySection.style.display = 'none';
@@ -72,13 +72,13 @@ window.onload = function () {
 var gotPermission = function () {
 	requestButton.style.display = 'none';
 	permissionElement.innerText = 'Permission: Granted';
-	console.log('App was granted the "usbDevices" permission.');
+	console.log('App was granted the \'usbDevices\' permission.');
 	awaitDevice();
 };
 
 var failedPermission = function () {
 	permissionElement.innerText = 'Permission: Failed';
-	console.log('App was not granted the "usbDevices" permission.');
+	console.log('App was not granted the \'usbDevices\' permission.');
 	console.log(chrome.runtime.lastError);
 };
 
