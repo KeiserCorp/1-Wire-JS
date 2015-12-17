@@ -1,5 +1,5 @@
 'use strict';
-var ow = (require('../ow.js'))();
+var ow = require('../ow.js');
 
 var requestButton = document.getElementById('requestPermission');
 var permissionElement = document.getElementById('permission');

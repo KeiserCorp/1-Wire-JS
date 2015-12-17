@@ -5122,11 +5122,11 @@ module.exports = function (ow) {
 	};
 
 	return ow;
-};
+}();
 
 },{"crc":13,"q":17}],19:[function(require,module,exports){
 'use strict';
-var ow = (require('../ow.js'))();
+var ow = require('../ow.js');
 
 var requestButton = document.getElementById('requestPermission');
 var permissionElement = document.getElementById('permission');

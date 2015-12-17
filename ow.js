@@ -911,4 +911,4 @@ module.exports = function (ow) {
 	};
 
 	return ow;
-};
+}();
