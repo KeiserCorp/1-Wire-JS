@@ -5126,8 +5126,7 @@ module.exports = function (ow) {
 
 },{"crc":13,"q":17}],19:[function(require,module,exports){
 'use strict';
-var oneWire = require('../ow.js');
-var ow = oneWire();
+var ow = (require('../ow.js'))();
 
 var requestButton = document.getElementById('requestPermission');
 var permissionElement = document.getElementById('permission');

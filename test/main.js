@@ -1,6 +1,5 @@
 'use strict';
-var oneWire = require('../ow.js');
-var ow = oneWire();
+var ow = (require('../ow.js'))();
 
 var requestButton = document.getElementById('requestPermission');
 var permissionElement = document.getElementById('permission');
