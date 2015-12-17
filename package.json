@@ -12,7 +12,7 @@
 		"url" : "git+https://github.com/KeiserCorp/1-Wire-JS.git"
 	},
 	"author" : "Zachary Cardoza",
-	"license" : "ISC",
+	"license" : "MIT",
 	"bugs" : {
 		"url" : "https://github.com/KeiserCorp/1-Wire-JS/issues"
 	},
