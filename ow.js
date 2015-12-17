@@ -1,12 +1,8 @@
 module.exports = function (ow) {
 	'use strict';
 	var Q = require('q');
-	var crc = require('crc');
+	var crc8 = require('./node_modules/crc/lib/crc8_1wire.js');
 	var ow = (ow || {});
-
-	var crc8 = function (value) {
-		return crc.crc81wire(value);
-	}
 
 	const TRANSACTION_TIMEOUT = 10;
 	var OverdriveEnabled = false;
