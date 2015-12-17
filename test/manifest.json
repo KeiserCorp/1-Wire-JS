@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "name": "1-Wire-JS-Test",
+  "name": "1 Wire JS Test",
   "short_name": "owjs-test",
   "description": "Test app for 1-Wire USB interface",
   "version": "0.0.1",
