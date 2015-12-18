@@ -4257,7 +4257,7 @@ module.exports = function () {
 	var Q = require('q');
 	var crc = require('crc');
 	var ow = {};
-	
+
 	var crc8 = function (value) {
 		return crc.crc81wire(value);
 	}
@@ -4375,7 +4375,7 @@ module.exports = function () {
 		addListener : function (fn) {
 			this.handlers.push(fn);
 		},
-		addedListener : function (fn) {
+		removeListener : function (fn) {
 			this.handlers = this.handlers.filter(function (item) {
 					if (item !== fn) {
 						return item;
@@ -5165,7 +5165,8 @@ module.exports = function () {
 	};
 
 	return ow;
-}();
+}
+();
 
 },{"crc":14,"q":18}],20:[function(require,module,exports){
 'use strict';
