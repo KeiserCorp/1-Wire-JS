@@ -9,7 +9,6 @@ module.exports = function () {
 	}
 
 	const TRANSACTION_TIMEOUT = 10;
-	var OverdriveEnabled = false;
 
 	/*****************************************
 	 *	Chrome Permissions
@@ -531,7 +530,6 @@ module.exports = function () {
 
 		return ow.deviceControlTransfer(controlTransferInfo)
 		.then(function () {
-			OverdriveEnabled = overdrive;
 			return ow.wireSetSpeed(overdrive);
 		}).then(function () {
 			return ow.deviceBulkTransfer(bulkTransferInfo)
