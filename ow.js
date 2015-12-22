@@ -171,7 +171,7 @@ module.exports = function () {
 	ow.onDeviceRemoved = new DeviceRemovedEvent();
 
 	chrome.usb.onDeviceRemoved.addListener(function (device) {
-		if (device && device.device === deviceObject.device) {
+		if (device && (deviceObject || {}).device && device.device === deviceObject.device) {
 			ow.onDeviceRemoved.dispatch();
 		}
 	});

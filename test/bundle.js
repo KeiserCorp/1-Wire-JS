@@ -4263,7 +4263,6 @@ module.exports = function () {
 	}
 
 	const TRANSACTION_TIMEOUT = 10;
-	var OverdriveEnabled = false;
 
 	/*****************************************
 	 *	Chrome Permissions
@@ -4426,7 +4425,7 @@ module.exports = function () {
 	ow.onDeviceRemoved = new DeviceRemovedEvent();
 
 	chrome.usb.onDeviceRemoved.addListener(function (device) {
-		if (device && device.device === deviceObject.device) {
+		if (device && (deviceObject || {}).device && device.device === deviceObject.device) {
 			ow.onDeviceRemoved.dispatch();
 		}
 	});
@@ -4785,7 +4784,6 @@ module.exports = function () {
 
 		return ow.deviceControlTransfer(controlTransferInfo)
 		.then(function () {
-			OverdriveEnabled = overdrive;
 			return ow.wireSetSpeed(overdrive);
 		}).then(function () {
 			return ow.deviceBulkTransfer(bulkTransferInfo)
