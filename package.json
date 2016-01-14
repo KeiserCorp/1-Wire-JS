@@ -1,6 +1,6 @@
 {
 	"name" : "1-wire-js",
-	"version" : "1.1.4",
+	"version" : "1.2.0",
 	"description" : "1-Wire USB Interface",
 	"main" : "ow.js",
 	"scripts" : {

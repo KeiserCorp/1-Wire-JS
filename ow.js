@@ -80,9 +80,24 @@ module.exports = function () {
 		return deferred.promise;
 	};
 
+	ow.deviceClose = function () {
+		return releaseDeviceInterface().
+		then(chrome.usb.closeDevice(deviceConnection, function () {
+				deviceObject = null;
+				deviceConnection = null;
+				deviceInterface = null;
+			}));
+	};
+
 	var claimDeviceInterface = function () {
 		var deferred = Q.defer();
 		chrome.usb.claimInterface(deviceConnection, deviceInterface.interfaceNumber, deferred.resolve);
+		return deferred.promise;
+	};
+
+	var releaseDeviceInterface = function () {
+		var deferred = Q.defer();
+		chrome.usb.releaseInterface(deviceConnection, deviceInterface.interfaceNumber, deferred.resolve);
 		return deferred.promise;
 	};
 
