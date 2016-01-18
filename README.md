@@ -31,47 +31,46 @@ var ow = window.ow;
 All APIs utilize the `Q` promise library, so most functions return a promise which has a `.then()` method. `.then()` methods accept two callbacks.  The first callback is called on success, and the second is called on failure.
 
 ```
-ow.requestPermission().then(success, failure);
+ow.permission.request().then(success, failure);
 ```
 
 - [Permission](#permission)
 - [Device](#device)
 - [Transfer](#transfer)
-- [Device Control](#device-control)
-- [1-Wire](#1-wire)
+- [Wire](#wire)
 - [Key](#key)
 
 ### Permission
-#### `checkPermission()`
+#### `permission.check()`
 Checks Chrome for permission to access USB device.
 
 ```
-ow.checkPermission().then(gotPermission);
+ow.permission.check().then(gotPermission);
 ```
 
-#### `requestPermission()`
+#### `permission.request()`
 Requests Chrome for permission to access USB device.  Method must be activated by a user event (such as a button press).
 
 ```
-ow.requestPermission().then(gotPermission, failedPermission);
+ow.permission.request().then(gotPermission, failedPermission);
 ```
 
 ### Device
-#### `deviceOpen()`
+#### `device.open()`
 Attempts to open the USB device.
 
 ```
-ow.deviceOpen().then(deviceOpened);
+ow.device.open().then(deviceOpened);
 ```
 
-#### `deviceClose()`
+#### `device.close()`
 Attempts to close the USB device.
 
 ```
-ow.deviceClose().then(deviceClosed);
+ow.device.close().then(deviceClosed);
 ```
 
-#### `onDeviceAdded`
+#### `device.onDeviceAdded`
 Event listener which triggers upon the addition of a USB device.
 
 `addListener(callback)` adds a callback to the event listener.
@@ -79,10 +78,10 @@ Event listener which triggers upon the addition of a USB device.
 `removeListener(callback)` removes a callback from the event listener.
 
 ```
-ow.onDeviceAdded.addListener(deviceConnected);
+ow.device.onDeviceAdded.addListener(deviceConnected);
 ```
 
-#### `onDeviceRemoved`
+#### `device.onDeviceRemoved`
 Event listener which triggers upon the removal of a USB device.
 
 `addListener(callback)` adds a callback to the event listener.
@@ -90,7 +89,26 @@ Event listener which triggers upon the removal of a USB device.
 `removeListener(callback)` removes a callback from the event listener.
 
 ```
-ow.onDeviceRemoved.addListener(deviceRemoved);
+ow.device.onDeviceRemoved.addListener(deviceRemoved);
+```
+
+#### `device.reset()`
+Performs a device reset which resets device speed and cancels all actions.
+
+```
+ow.device.reset().then(deviceReady);
+```
+
+#### `device.getStatus()`
+Passes device state registers object into callback.
+
+```
+ow.device.getStatus()
+  .then(function (status) {
+    if (status.ResultRegisters.DetectKey){
+      console.log('Key Detected');
+    }
+  });
 ```
 
 ### Transfer
@@ -113,53 +131,33 @@ var transferInfo = {
 };
 ```
 
-#### `deviceInterruptTransfer()`
+#### `device.interruptTransfer()`
 Performs a device interrupt transfer.
 
 ```
-ow.deviceInterruptTransfer().then(interruptTransferComplete);
+ow.device.interruptTransfer().then(interruptTransferComplete);
 ```
 
-#### `deviceControlTransfer(transferInfo)`
+#### `device.controlTransfer(transferInfo)`
 Performs a device control transfer.
 
 ```
-ow.deviceControlTransfer(transferInfo).then(controlTransferComplete);
+ow.device.controlTransfer(transferInfo).then(controlTransferComplete);
 ```
 
-#### `deviceBulkTransfer(transferInfo)`
+#### `device.bulkTransfer(transferInfo)`
 Performs a device bulk transfer.
 
 ```
-ow.deviceBulkTransfer(transferInfo).then(bulkTransferComplete);
+ow.device.bulkTransfer(transferInfo).then(bulkTransferComplete);
 ```
 
-### Device Control
-#### `deviceReset()`
-Performs a device reset which resets device speed and cancels all actions.
-
-```
-ow.deviceReset().then(deviceReady);
-```
-
-#### `deviceGetStatus()`
-Passes device state registers object into callback.
-
-```
-ow.deviceGetStatus()
-  .then(function (status) {
-    if (status.ResultRegisters.DetectKey){
-      console.log('Key Detected');
-    }
-  });
-```
-
-### 1-Wire
-#### `wireDetectShort()`
+### Wire
+#### `wire.detectShort()`
 Detects short in the line and passes the result into callback.
 
 ```
-ow.wireDetectShort()
+ow.wire.detectShort()
   .then(function (shorted) {
     if (shorted) {
       throw new Error("Short Detected");
@@ -167,64 +165,65 @@ ow.wireDetectShort()
   });
 ```
 
-#### `wireSetSpeed(overdrive)`
+#### `wire.setSpeed(overdrive)`
 Sets the speed to either normal or overdrive based on passed in boolean value `overdrive`;
 
 ```
-ow.wireSetSpeed(true).then(speedSet);
+ow.wire.setSpeed(true).then(speedSet);
 ```
 
-#### `wireReset()`
+#### `wire.rest()`
 Sends a reset and then checks for a wire short.
 
 ```
-ow.wireReset().then(resetComplete);
+ow.wire.rest().then(resetComplete);
 ```
 
-#### `wireWrite(data)`
+#### `wire.write(data)`
 Writes data onto the wire.
 
 `data` must be type `Uint8Array` or data loss may occur.
 
 ```
-ow.wireWrite(data).then(writeComplete);
+ow.wire.write(data).then(writeComplete);
 ```
 
-#### `wireWriteBit(bit)`
+#### `wire.writeBit(bit)`
 Writes a single bit onto the wire.
 
 ```
-ow.wireWriteBit(bit).then(writeBitComplete);
+ow.wire.writeBit(bit).then(writeBitComplete);
 ```
 
-#### `wireRead(byteCount)`
+#### `wire.read(byteCount)`
 Read a length of data defined by `byteCount` from the wire and passes it to callback.
 
 ```
-ow.wireRead(0x20)
+ow.wire.read(0x20)
   .then(function(data){
     storeData(data);
   });
 ```
 
-#### `wireReadBit()`
+#### `wire.readBit()`
 Reads a single bit of data from the wire and passes it to callback.
 
 ```
-ow.wireReadBit()
+ow.wire.readBit()
   .then(function(bitSet){
     test = bitSet;
   });
 ```
 
-#### `wireClearByte()`
+#### `wire.clearByte()`
 Clears a single byte of data from the wire.
 
 ```
-ow.wireClearByte().then(wireCleared);
+ow.wire.clearByte().then(wireCleared);
 ```
+
 ### Key
-#### `keyRomCommand(match, keyRom, overdrive)`
+#### `key.romCommand(match, keyRom, overdrive)`
 Performs a key ROM match operation on the network.
 
 `match` determines if commands should target a specific key ROM (`true`) or if commands should target all devices (`false`).
@@ -234,82 +233,82 @@ Performs a key ROM match operation on the network.
 `overdrive` should be set to `true` if commands should be performed in overdrive speed.
 
 ```
-ow.keyRomCommand(true, keyRom, true).then(keyRomMatched);
+ow.key.romCommand(true, keyRom, true).then(keyRomMatched);
 ```
 
-#### `keyRomMatch(keyRom)`
+#### `key.romMatch(keyRom)`
 Performs a key ROM match at normal speed.
 
-*Alias for `ow.keyRomCommand(true, keyRom, false)`*
+_Alias for `ow.key.romCommand(true, keyRom, false)`_
 
 ```
-ow.keyRomMatch(keyRom).then(keyRomMatched);
+ow.key.romMatch(keyRom).then(keyRomMatched);
 ```
 
-#### `keyRomMatchOverdrive(keyRom)`
+#### `key.romMatchOverdrive(keyRom)`
 Performs a key ROM match at overdrive speed.
 
-*Alias for `ow.keyRomCommand(true, keyRom, true)`*
+_Alias for `ow.key.romCommand(true, keyRom, true)`_
 
 ```
-ow.keyRomMatch(keyRom).then(keyRomMatched);
+ow.key.romMatch(keyRom).then(keyRomMatched);
 ```
 
-#### `keyRomSkip()`
+#### `key.romSkip()`
 Performs a key ROM skip at normal speed.
 
-*Alias for `ow.keyRomCommand(false, null, false)`*
+_Alias for `ow.key.romCommand(false, null, false)`_
 
 ```
-ow.keyRomSkip().then(keyRomSkipped);
+ow.key.romSkip().then(keyRomSkipped);
 ```
 
-#### `keyRomSkipOverdrive()`
+#### `key.romSkipOverdrive()`
 Performs a key ROM skip at overdrive speed.
 
-*Alias for `ow.keyRomCommand(false, null, true)`*
+_Alias for `ow.key.romCommand(false, null, true)`_
 
 ```
-ow.keyRomSkipOverdrive().then(keyRomSkipped);
+ow.key.romSkipOverdrive().then(keyRomSkipped);
 ```
 
-#### `keySearchFirst()`
+#### `key.searchFirst()`
 Searches network for keys and passes the first key ROM to the callback.
 
 ```
-ow.keySearchFirst()
+ow.key.searchFirst()
   .then(function(rom){
       keyROM = rom;
   });
 ```
 
-#### `keySearchNext()`
+#### `key.searchNext()`
 Searches network for keys and passes the next key ROM to the callback.
 
-*This method will loop through key ROMs*
+_This method will loop through key ROMs_
 
 ```
-ow.keySearchNext()
+ow.key.searchNext()
   .then(function(rom){
       keyRom = rom;
   });
 ```
 
-#### `keyReadAll(keyRom, overdrive)`
+#### `key.readAll(keyRom, overdrive)`
 Reads all of the data from the key targeted by `keyRom` and passes the data to the callback.
 
 `keyRom` is the target key ROM stored as `Uint8Array`.
 
-`overdrive` is a boolean value determining operation speed. *(Default: false)*
+`overdrive` is a boolean value determining operation speed. _(Default: false)_
 
 ```
-ow.keyReadAll(keyRom, true)
+ow.key.readAll(keyRom, true)
   .then(function(data){
       keyData = data;
   });
 ```
 
-#### `keyWrite(keyRom, offset, data, overdrive)`
+#### `key.write(keyRom, offset, data, overdrive)`
 Writes `data` to the key targeted by `keyRom`.
 
 `keyRom` is the target key ROM stored as `Uint8Array`.
@@ -318,26 +317,26 @@ Writes `data` to the key targeted by `keyRom`.
 
 `data` is the data to be written to the key memory stored as `Uint8Array`.
 
-`overdrive` is a boolean value determining operation speed. *(Default: false)*
+`overdrive` is a boolean value determining operation speed. _(Default: false)_
 
 ```
-ow.keyWrite(keyRom, 0x00, data, true).then(writeComplete);
+ow.key.write(keyRom, 0x00, data, true).then(writeComplete);
 ```
 
-#### `keyWriteAll(keyRom, data, overdrive)`
+#### `key.writeAll(keyRom, data, overdrive)`
 Writes `data` to the key targeted by `keyRom` starting at the memory beginning.
 
 `keyRom` is the target key ROM stored as `Uint8Array`.
 
 `data` is the data to be written to the key memory stored as `Uint8Array`.
 
-`overdrive` is a boolean value determining operation speed. *(Default: false)*
+`overdrive` is a boolean value determining operation speed. _(Default: false)_
 
 ```
-ow.keyWriteAll(keyRom, data, true).then(writeComplete);
+ow.key.writeAll(keyRom, data, true).then(writeComplete);
 ```
 
-#### `keyWriteDiff(keyRom, newData, oldData, overdrive)`
+#### `key.writeDiff(keyRom, newData, oldData, overdrive)`
 Writes `newData` to the key targeted by `keyRom` starting at the memory beginning using a diffing algorithm to speed up writes.
 
 `keyRom` is the target key ROM stored as `Uint8Array`.
@@ -346,10 +345,10 @@ Writes `newData` to the key targeted by `keyRom` starting at the memory beginnin
 
 `oldData` is the current key memory stored as `Uint8Array`.
 
-`overdrive` is a boolean value determining operation speed. *(Default: false)*
+`overdrive` is a boolean value determining operation speed. _(Default: false)_
 
 ```
-ow.keyWriteAll(keyRom, newData, lastDump, true).then(writeComplete);
+ow.key.writeAll(keyRom, newData, lastDump, true).then(writeComplete);
 ```
 
 ## Contributors

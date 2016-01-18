@@ -4256,7 +4256,12 @@ module.exports = function () {
 	'use strict';
 	var Q = require('q');
 	var crc = require('crc');
-	var ow = {};
+	var ow = {
+		permission: {},
+		device: {},
+		wire: {},
+		key: {}
+	};
 
 	var crc8 = function (value) {
 		return crc.crc81wire(value);
@@ -4281,7 +4286,7 @@ module.exports = function () {
 		}]
 	};
 
-	ow.checkPermission = function () {
+	ow.permission.check = function () {
 		var deferred = Q.defer();
 		chrome.permissions.contains(permissionObj, function (result) {
 			if (result) {
@@ -4293,7 +4298,7 @@ module.exports = function () {
 		return deferred.promise;
 	};
 
-	ow.requestPermission = function () {
+	ow.permission.request = function () {
 		var deferred = Q.defer();
 		chrome.permissions.request(permissionObj, function (result) {
 			if (result) {
@@ -4313,7 +4318,7 @@ module.exports = function () {
 	var deviceConnection;
 	var deviceInterface;
 
-	ow.deviceOpen = function () {
+	ow.device.open = function () {
 		var deferred = Q.defer();
 		chrome.usb.getDevices(DEVICE_INFO, function (devices) {
 			chrome.usb.findDevices(DEVICE_INFO, function (connections) {
@@ -4334,7 +4339,7 @@ module.exports = function () {
 		return deferred.promise;
 	};
 
-	ow.deviceClose = function () {
+	ow.device.close = function () {
 		return releaseDeviceInterface()
 			.
 		then(chrome.usb.closeDevice(deviceConnection, function () {
@@ -4405,10 +4410,10 @@ module.exports = function () {
 		}
 	}
 
-	ow.onDeviceAdded = new DeviceAddedEvent();
+	ow.device.onDeviceAdded = new DeviceAddedEvent();
 
 	chrome.usb.onDeviceAdded.addListener(function () {
-		ow.onDeviceAdded.dispatch();
+		ow.device.onDeviceAdded.dispatch();
 	});
 
 	/*****************************************
@@ -4438,12 +4443,12 @@ module.exports = function () {
 		}
 	}
 
-	ow.onDeviceRemoved = new DeviceRemovedEvent();
+	ow.device.onDeviceRemoved = new DeviceRemovedEvent();
 
 	chrome.usb.onDeviceRemoved.addListener(function (device) {
 		if (device && (deviceObject || {})
 			.device && device.device === deviceObject.device) {
-			ow.onDeviceRemoved.dispatch();
+			ow.device.onDeviceRemoved.dispatch();
 		}
 	});
 
@@ -4451,7 +4456,7 @@ module.exports = function () {
 	 *	Device Interrupt Transfer
 	 *****************************************/
 
-	ow.deviceInterruptTransfer = function () {
+	ow.device.interruptTransfer = function () {
 		var deferred = Q.defer();
 
 		var transferInfo = {
@@ -4476,7 +4481,7 @@ module.exports = function () {
 	 *	Device Control Transfer
 	 *****************************************/
 
-	ow.deviceControlTransfer = function (transferInfo) {
+	ow.device.controlTransfer = function (transferInfo) {
 		var deferred = Q.defer();
 
 		transferInfo.timeout = TRANSACTION_TIMEOUT;
@@ -4495,7 +4500,7 @@ module.exports = function () {
 	 *	Device Bulk Transfer
 	 *****************************************/
 
-	ow.deviceBulkTransfer = function (transferInfo) {
+	ow.device.bulkTransfer = function (transferInfo) {
 		var deferred = Q.defer();
 
 		transferInfo.timeout = TRANSACTION_TIMEOUT;
@@ -4514,7 +4519,7 @@ module.exports = function () {
 	 *	Device Reset
 	 *****************************************/
 
-	ow.deviceReset = function () {
+	ow.device.reset = function () {
 		var transferInfo = {
 			direction: 'out',
 			recipient: 'device',
@@ -4525,8 +4530,8 @@ module.exports = function () {
 			data: new Uint8Array(0)
 				.buffer
 		};
-		return ow.deviceControlTransfer(transferInfo)
-			.then(ow.wireDetectShort)
+		return ow.device.controlTransfer(transferInfo)
+			.then(ow.wire.detectShort)
 			.then(function (shorted) {
 				if (shorted) {
 					throw new Error("Reset Failed: Short Detected");
@@ -4582,13 +4587,13 @@ module.exports = function () {
 	 *	1-Wire Get Status
 	 *****************************************/
 
-	ow.deviceGetStatus = function () {
+	ow.device.getStatus = function () {
 		var transferInfo = {
 			direction: deviceEndpoints.interrupt.direction,
 			endpoint: deviceEndpoints.interrupt.address,
 			length: 0x20
 		};
-		return ow.deviceBulkTransfer(transferInfo)
+		return ow.device.bulkTransfer(transferInfo)
 			.then(function (result) {
 				return parseStateRegisters(result.data);
 			});
@@ -4598,8 +4603,8 @@ module.exports = function () {
 	 *	1-Wire Detect Short
 	 *****************************************/
 
-	ow.wireDetectShort = function () {
-		return ow.deviceGetStatus()
+	ow.wire.detectShort = function () {
+		return ow.device.getStatus()
 			.then(function (status) {
 				if (status.CommCommandBufferStatus !== 0) {
 					return true;
@@ -4620,7 +4625,7 @@ module.exports = function () {
 	 *	1-Wire Set Speed
 	 *****************************************/
 
-	ow.wireSetSpeed = function (overdrive) {
+	ow.wire.setSpeed = function (overdrive) {
 		var index = (overdrive) ? 0x0002 : 0x0001;
 		var transferInfo = {
 			direction: 'out',
@@ -4632,14 +4637,14 @@ module.exports = function () {
 			data: new Uint8Array(0)
 				.buffer
 		};
-		return ow.deviceControlTransfer(transferInfo);
+		return ow.device.controlTransfer(transferInfo);
 	};
 
 	/*****************************************
 	 *	1-Wire Reset
 	 *****************************************/
 
-	ow.wireReset = function () {
+	ow.wire.reset = function () {
 		var transferInfo = {
 			direction: 'out',
 			recipient: 'device',
@@ -4651,11 +4656,11 @@ module.exports = function () {
 				.buffer
 		};
 
-		return ow.deviceControlTransfer(transferInfo)
+		return ow.device.controlTransfer(transferInfo)
 			.then(function () {
 				var deferred = Q.defer();
 				setTimeout(function () {
-					ow.wireDetectShort()
+					ow.wire.detectShort()
 						.then(function (shorted) {
 							if (shorted) {
 								deferred.reject();
@@ -4667,7 +4672,7 @@ module.exports = function () {
 				return deferred.promise;
 			})
 			.fail(function () {
-				return ow.deviceReset();
+				return ow.device.reset();
 			})
 			.fail(function () {
 				throw new Error("Reset Failed: Unrecoverable short detected");
@@ -4678,7 +4683,7 @@ module.exports = function () {
 	 *	1-Wire Write
 	 *****************************************/
 
-	ow.wireWrite = function (data) {
+	ow.wire.write = function (data) {
 		var bulkTransferInfo = {
 			direction: deviceEndpoints.bulkOut.direction,
 			endpoint: deviceEndpoints.bulkOut.address,
@@ -4698,9 +4703,9 @@ module.exports = function () {
 			timeout: TRANSACTION_TIMEOUT
 		};
 
-		return ow.deviceBulkTransfer(bulkTransferInfo)
+		return ow.device.bulkTransfer(bulkTransferInfo)
 			.then(function () {
-				return ow.deviceControlTransfer(controlTransferInfo);
+				return ow.device.controlTransfer(controlTransferInfo);
 			});
 	};
 
@@ -4708,7 +4713,7 @@ module.exports = function () {
 	 *	1-Wire Write Bit
 	 *****************************************/
 
-	ow.wireWriteBit = function (bit) {
+	ow.wire.writeBit = function (bit) {
 		var transferInfo = {
 			direction: 'out',
 			recipient: 'device',
@@ -4720,21 +4725,21 @@ module.exports = function () {
 				.buffer
 		};
 
-		return ow.deviceControlTransfer(transferInfo);
+		return ow.device.controlTransfer(transferInfo);
 	};
 
 	/*****************************************
 	 *	1-Wire Read
 	 *****************************************/
 
-	ow.wireRead = function (byteCount) {
+	ow.wire.read = function (byteCount) {
 		var transferInfo = {
 			direction: deviceEndpoints.bulkIn.direction,
 			endpoint: deviceEndpoints.bulkIn.address,
 			length: byteCount
 		};
 
-		return ow.deviceBulkTransfer(transferInfo)
+		return ow.device.bulkTransfer(transferInfo)
 			.then(function (result) {
 				return new Uint8Array(result.data);
 			});
@@ -4744,7 +4749,7 @@ module.exports = function () {
 	 *	1-Wire Read Bit
 	 *****************************************/
 
-	ow.wireReadBit = function () {
+	ow.wire.readBit = function () {
 		var transferInfo = {
 			direction: 'out',
 			recipient: 'device',
@@ -4756,9 +4761,9 @@ module.exports = function () {
 				.buffer
 		};
 
-		return ow.deviceControlTransfer(transferInfo)
+		return ow.device.controlTransfer(transferInfo)
 			.then(function (result) {
-				return ow.wireRead(1);
+				return ow.wire.read(1);
 			})
 			.then(function (data) {
 				return data[0];
@@ -4769,15 +4774,15 @@ module.exports = function () {
 	 *	1-Wire Clear Byte
 	 *****************************************/
 
-	ow.wireClearByte = function () {
-		return ow.wireRead(1);
+	ow.wire.clearByte = function () {
+		return ow.wire.read(1);
 	};
 
 	/*****************************************
 	 *	Key ROM Command
 	 *****************************************/
 
-	ow.keyRomCommand = function (match, keyRom, overdrive) {
+	ow.key.romCommand = function (match, keyRom, overdrive) {
 		var index;
 		var overdrive = (overdrive || false);
 		var bulkTransferInfo = {
@@ -4814,12 +4819,12 @@ module.exports = function () {
 				.buffer
 		};
 
-		return ow.deviceControlTransfer(controlTransferInfo)
+		return ow.device.controlTransfer(controlTransferInfo)
 			.then(function () {
-				return ow.wireSetSpeed(overdrive);
+				return ow.wire.setSpeed(overdrive);
 			})
 			.then(function () {
-				return ow.deviceBulkTransfer(bulkTransferInfo)
+				return ow.device.bulkTransfer(bulkTransferInfo)
 			});
 	};
 
@@ -4827,24 +4832,24 @@ module.exports = function () {
 	 *	Key ROM Match
 	 *****************************************/
 
-	ow.keyRomMatch = function (keyRom) {
-		return ow.keyRomCommand(true, keyRom, false);
+	ow.key.romMatch = function (keyRom) {
+		return ow.key.romCommand(true, keyRom, false);
 	};
 
-	ow.keyRomMatchOverdrive = function (keyRom) {
-		return ow.keyRomCommand(true, keyRom, true);
+	ow.key.romMatchOverdrive = function (keyRom) {
+		return ow.key.romCommand(true, keyRom, true);
 	};
 
 	/*****************************************
 	 *	Key ROM Skip
 	 *****************************************/
 
-	ow.keyRomSkip = function () {
-		return ow.keyRomCommand(false, null, false);
+	ow.key.romSkip = function () {
+		return ow.key.romCommand(false, null, false);
 	};
 
-	ow.keyRomSkipOverdrive = function () {
-		return ow.keyRomCommand(false, null, true);
+	ow.key.romSkipOverdrive = function () {
+		return ow.key.romCommand(false, null, true);
 	};
 
 	/*****************************************
@@ -4876,7 +4881,7 @@ module.exports = function () {
 		return deferred.promise;
 	};
 
-	ow.keySearchFirst = function () {
+	ow.key.searchFirst = function () {
 		var parameters = {
 			lastDiscrepancy: 0,
 			lastDevice: false,
@@ -4886,7 +4891,7 @@ module.exports = function () {
 		return keySearch(parameters);
 	};
 
-	ow.keySearchNext = function (parameters) {
+	ow.key.searchNext = function (parameters) {
 		return keySearch(lastSearchParameters);
 	};
 
@@ -4905,12 +4910,12 @@ module.exports = function () {
 			lastDiscrepancy: parameters.lastDiscrepancy
 		};
 
-		return ow.wireSetSpeed(false)
-			.then(ow.wireReset)
+		return ow.wire.setSpeed(false)
+			.then(ow.wire.reset)
 			.then(function () {
-				return ow.wireWrite(new Uint8Array([0xF0]));
+				return ow.wire.write(new Uint8Array([0xF0]));
 			})
-			.then(ow.wireClearByte)
+			.then(ow.wire.clearByte)
 			.then(function () {
 				return romSubSearch(searchObject);
 			})
@@ -4925,12 +4930,12 @@ module.exports = function () {
 	};
 
 	var romSubSearch = function (searchObject) {
-		return ow.wireReadBit()
+		return ow.wire.readBit()
 			.then(function (idBit) {
 				searchObject.idBit = idBit;
 			})
 			.then(function () {
-				return ow.wireReadBit();
+				return ow.wire.readBit();
 			})
 			.then(function (cmpIdBit) {
 				searchObject.cmpIdBit = cmpIdBit;
@@ -4952,7 +4957,7 @@ module.exports = function () {
 					} else {
 						searchObject.romId[searchObject.romByteNumber] &= ~searchObject.romByteMask;
 					}
-					return ow.wireWriteBit(searchObject.searchDirection)
+					return ow.wire.writeBit(searchObject.searchDirection)
 						.then(function () {
 							searchObject.idBitNumber++;
 							searchObject.romByteMask <<= 1;
@@ -4988,23 +4993,23 @@ module.exports = function () {
 	 *	Key Read All Data
 	 *****************************************/
 
-	ow.keyReadAll = function (keyRom, overdrive) {
-		return ow.wireSetSpeed(false)
-			.then(ow.wireReset)
+	ow.key.readAll = function (keyRom, overdrive) {
+		return ow.wire.setSpeed(false)
+			.then(ow.wire.reset)
 			.then(function () {
 				if (overdrive) {
-					return ow.keyRomMatchOverdrive(keyRom);
+					return ow.key.romMatchOverdrive(keyRom);
 				} else {
-					return ow.keyRomMatch(keyRom);
+					return ow.key.romMatch(keyRom);
 				}
 			})
 			.then(function () {
 				var command = new Uint8Array([0xF0, 0x00, 0x00]);
-				return ow.wireWrite(command);
+				return ow.wire.write(command);
 			})
-			.then(ow.wireClearByte)
-			.then(ow.wireClearByte)
-			.then(ow.wireClearByte)
+			.then(ow.wire.clearByte)
+			.then(ow.wire.clearByte)
+			.then(ow.wire.clearByte)
 			.then(function () {
 				return keyReadMemory();
 			});
@@ -5018,7 +5023,7 @@ module.exports = function () {
 		for (var x = 0; x < buffer.length; x++) {
 			buffer[x] = 0xFF;
 		}
-		return ow.wireWrite(buffer)
+		return ow.wire.write(buffer)
 			.then(function () {
 				return keyReadPage(memory[pageIndex]);
 			})
@@ -5032,7 +5037,7 @@ module.exports = function () {
 
 	var keyReadPage = function (page, index) {
 		var index = (index || 0);
-		return ow.wireRead(16)
+		return ow.wire.read(16)
 			.then(function (result) {
 				result.forEach(function (entry) {
 					page[index++] = entry;
@@ -5047,33 +5052,33 @@ module.exports = function () {
 	 *	Key Write
 	 *****************************************/
 
-	ow.keyWrite = function (keyRom, offset, data, overdrive) {
+	ow.key.write = function (keyRom, offset, data, overdrive) {
 		var offset = (offset || 0);
 		var offsetMSB = (offset & 0xFF);
 		var offsetLSB = (offset & 0xFF00) >> 8;
 		var endingOffset = data.length - 1;
 		var data = (data || new Uint8Array(0));
 
-		return ow.wireSetSpeed(false)
+		return ow.wire.setSpeed(false)
 			.then(function () {
 				return writeToScratch(keyRom, offset, data, overdrive);
 			})
-			.then(ow.wireReset)
+			.then(ow.wire.reset)
 			.then(function () {
 				if (overdrive) {
-					return ow.keyRomMatchOverdrive(keyRom);
+					return ow.key.romMatchOverdrive(keyRom);
 				} else {
-					return ow.keyRomMatch(keyRom);
+					return ow.key.romMatch(keyRom);
 				}
 			})
 			.then(function () {
 				var command = new Uint8Array([0x55, offsetMSB, offsetLSB, endingOffset]);
-				return ow.wireWrite(command);
+				return ow.wire.write(command);
 			})
-			.then(ow.wireClearByte)
-			.then(ow.wireClearByte)
-			.then(ow.wireClearByte)
-			.then(ow.wireClearByte)
+			.then(ow.wire.clearByte)
+			.then(ow.wire.clearByte)
+			.then(ow.wire.clearByte)
+			.then(ow.wire.clearByte)
 	};
 
 	var writeToScratch = function (keyRom, offset, data, overdrive) {
@@ -5085,43 +5090,43 @@ module.exports = function () {
 
 		var returnedData;
 
-		return ow.wireReset()
+		return ow.wire.reset()
 			.then(function () {
 				if (overdrive) {
-					return ow.keyRomMatchOverdrive(keyRom);
+					return ow.key.romMatchOverdrive(keyRom);
 				} else {
-					return ow.keyRomMatch(keyRom);
+					return ow.key.romMatch(keyRom);
 				}
 			})
 			.then(function () {
 				var command = new Uint8Array([0x0F, offsetMSB, offsetLSB]);
-				return ow.wireWrite(command);
+				return ow.wire.write(command);
 			})
-			.then(ow.wireClearByte)
-			.then(ow.wireClearByte)
-			.then(ow.wireClearByte)
+			.then(ow.wire.clearByte)
+			.then(ow.wire.clearByte)
+			.then(ow.wire.clearByte)
 			.then(function () {
 				return writeData(data, 0);
 			})
-			.then(ow.wireReset)
+			.then(ow.wire.reset)
 			.then(function () {
 				if (overdrive) {
-					return ow.keyRomMatchOverdrive(keyRom);
+					return ow.key.romMatchOverdrive(keyRom);
 				} else {
-					return ow.keyRomMatch(keyRom);
+					return ow.key.romMatch(keyRom);
 				}
 			})
 			.then(function () {
 				var command = new Uint8Array([0xAA]);
-				return ow.wireWrite(command);
+				return ow.wire.write(command);
 			})
 			.then(function () {
-				return ow.wireRead(data.length)
+				return ow.wire.read(data.length)
 			})
 			.then(function (data) {
 				returnedData = data;
 			})
-			.then(ow.wireClearByte)
+			.then(ow.wire.clearByte)
 			.then(function () {
 				if ((returnedData.length == data.length) && returnedData.every(function (element, index) {
 						return element === data[index];
@@ -5138,7 +5143,7 @@ module.exports = function () {
 		for (var x = 0; x < size; x++) {
 			sendData[x] = data[offset + x];
 		}
-		return ow.wireWrite(sendData)
+		return ow.wire.write(sendData)
 			.then(function () {
 				if ((data.length - (offset + size)) > 0) {
 					return writeData(data, offset + size);
@@ -5150,13 +5155,13 @@ module.exports = function () {
 	 *	Key Write All Data
 	 *****************************************/
 
-	ow.keyWriteAll = function (keyRom, data, overdrive) {
+	ow.key.writeAll = function (keyRom, data, overdrive) {
 		return keyWriteAllOffset(keyRom, data, 0, overdrive);
 	};
 
 	var keyWriteAllOffset = function (keyRom, data, page, overdrive) {
 		var offset = page * 32;
-		return ow.keyWrite(keyRom, offset, data[page], overdrive)
+		return ow.key.write(keyRom, offset, data[page], overdrive)
 			.then(function () {
 				if (data.length > page + 1) {
 					return keyWriteAllOffset(keyRom, data, page + 1, overdrive)
@@ -5168,10 +5173,10 @@ module.exports = function () {
 	 *	Key Write Diff Data
 	 *****************************************/
 
-	ow.keyWriteDiff = function (keyRom, newData, oldData, overdrive) {
+	ow.key.writeDiff = function (keyRom, newData, oldData, overdrive) {
 		if ((oldData || new Array(0))
 			.length < newData.length) {
-			return ow.keyReadAll(keyRom, overdrive)
+			return ow.key.readAll(keyRom, overdrive)
 				.then(function (resultData) {
 					return keyWriteDiffOffset(keyRom, newData, resultData, 0, overdrive);
 				});
@@ -5188,7 +5193,7 @@ module.exports = function () {
 				return keyWriteDiffOffset(keyRom, newData, oldData, page + 1, overdrive)
 			}
 		}
-		return ow.keyWrite(keyRom, offset, newData[page], overdrive)
+		return ow.key.write(keyRom, offset, newData[page], overdrive)
 			.then(function () {
 				if (newData.length > page + 1) {
 					return keyWriteDiffOffset(keyRom, newData, oldData, page + 1, overdrive)
