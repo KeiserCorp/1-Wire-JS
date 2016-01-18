@@ -39,6 +39,7 @@ ow.requestPermission().then(success, failure);
 - [Transfer](#transfer)
 - [Device Control](#device-control)
 - [1-Wire](#1-wire)
+- [Key](#keye)
 
 ### Permission
 #### `checkPermission()`
@@ -161,9 +162,115 @@ Detects short in the line and passes the result into callback.
 ow.wireDetectShort()
   .then(function (shorted) {
     if (shorted) {
-      throw new Error("Reset Failed: Short Detected");
+      throw new Error("Short Detected");
     }
   });
+```
+
+#### `wireSetSpeed(overdrive)`
+Sets the speed to either normal or overdrive based on passed in boolean value `overdrive`;
+
+```
+ow.wireSetSpeed(true).then(speedSet);
+```
+
+#### `wireReset()`
+Sends a reset and then checks for a wire short.
+
+```
+ow.wireReset().then(resetComplete);
+```
+
+#### `wireWrite(data)`
+Writes data onto the wire.
+
+`data` must be type `Uint8Array` or data loss may occur.
+
+```
+ow.wireWrite(data).then(writeComplete);
+```
+
+#### `wireWriteBit(bit)`
+Writes a single bit onto the wire.
+
+```
+ow.wireWriteBit(bit).then(writeBitComplete);
+```
+
+#### `wireRead(byteCount)`
+Read a length of data defined by `byteCount` from the wire and passes it to callback.
+
+```
+ow.wireRead(0x20)
+  .then(function(data){
+    storeData(data);
+  });
+```
+
+#### `wireReadBit()`
+Reads a single bit of data from the wire and passes it to callback.
+
+```
+ow.wireReadBit()
+  .then(function(bitSet){
+    test = bitSet;
+  });
+```
+
+#### `wireClearByte()`
+Clears a single byte of data from the wire.
+
+```
+ow.wireClearByte().then(wireCleared);
+```
+### Key
+#### `keyRomCommand(match, keyRom, overdrive)`
+Performs a key ROM match operation on the network.
+
+`match` determines if commands should target a specific key ROM (`true`) or if commands should target all devices (`false`).
+
+`keyRom` should contain the ROM of the device being targeted if `match` is `true`.
+
+`overdrive` should be set to `true` if commands should be performed in overdrive speed.
+
+```
+ow.keyRomCommand(true, keyRom, true).then(keyRomMatched);
+```
+
+#### `keyRomMatch(keyRom)`
+Performs a key ROM match at normal speed.
+
+*Alias for `ow.keyRomCommand(true, keyRom, false)`*
+
+```
+ow.keyRomMatch(keyRom).then(keyRomMatched);
+```
+
+#### `keyRomMatchOverdrive(keyRom)`
+Performs a key ROM match at overdrive speed.
+
+*Alias for `ow.keyRomCommand(true, keyRom, true)`*
+
+```
+ow.keyRomMatch(keyRom).then(keyRomMatched);
+```
+
+#### `keyRomSkip()`
+Performs a key ROM skip at normal speed.
+
+*Alias for `ow.keyRomCommand(false, null, false)`*
+
+```
+ow.keyRomSkip().then(keyRomSkipped);
+```
+
+#### `keyRomSkipOverdrive()`
+Performs a key ROM skip at overdrive speed.
+
+*Alias for `ow.keyRomCommand(false, null, true)`*
+
+```
+ow.keyRomSkipOverdrive().then(keyRomSkipped);
 ```
 
 ## Contributors
