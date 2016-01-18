@@ -1,33 +1,33 @@
 {
-	"name" : "1-wire-js",
-	"version" : "1.2.0",
-	"description" : "1-Wire USB Interface",
-	"main" : "ow.js",
-	"scripts" : {
-		"build" : "gulp",
-		"watch" : "gulp watch"
+	"name": "1-wire-js",
+	"version": "1.2.1",
+	"description": "1-Wire USB Interface",
+	"main": "./src/ow.js",
+	"scripts": {
+		"build": "gulp",
+		"watch": "gulp watch"
 	},
-	"repository" : {
-		"type" : "git",
-		"url" : "git+https://github.com/KeiserCorp/1-Wire-JS.git"
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/KeiserCorp/1-Wire-JS.git"
 	},
-	"author" : "Zachary Cardoza",
-	"license" : "MIT",
-	"bugs" : {
-		"url" : "https://github.com/KeiserCorp/1-Wire-JS/issues"
+	"author": "Zachary Cardoza",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/KeiserCorp/1-Wire-JS/issues"
 	},
-	"homepage" : "https://github.com/KeiserCorp/1-Wire-JS#readme",
-	"dependencies" : {
-		"q" : "^1.4.1",
-		"crc" : "^3.3.0"
+	"homepage": "https://github.com/KeiserCorp/1-Wire-JS#readme",
+	"dependencies": {
+		"q": "^1.4.1",
+		"crc": "^3.3.0"
 	},
-	"devDependencies" : {
-		"browserify" : "^12.0.1",
-		"gulp" : "^3.9.0",
-		"gulp-rename" : "^1.2.2",
-		"gulp-streamify" : "^1.0.2",
-		"gulp-uglify" : "^1.5.1",
-		"gulp-watch" : "^4.3.5",
-		"vinyl-source-stream" : "^1.1.0"
+	"devDependencies": {
+		"browserify": "^12.0.1",
+		"gulp": "^3.9.0",
+		"gulp-rename": "^1.2.2",
+		"gulp-streamify": "^1.0.2",
+		"gulp-uglify": "^1.5.1",
+		"gulp-watch": "^4.3.5",
+		"vinyl-source-stream": "^1.1.0"
 	}
 }
