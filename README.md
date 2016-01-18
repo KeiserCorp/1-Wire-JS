@@ -34,7 +34,13 @@ All APIs utilize the `Q` promise library, so most functions return a promise whi
 ow.requestPermission().then(success, failure);
 ```
 
-### Permissions
+- [Permission](#permission)
+- [Device](#device)
+- [Transfer](#transfer)
+- [Device Control](#device-control)
+- [1-Wire](#1-wire)
+
+### Permission
 #### `checkPermission()`
 Checks Chrome for permission to access USB device.
 
@@ -43,7 +49,7 @@ ow.checkPermission().then(gotPermission);
 ```
 
 #### `requestPermission()`
-Requests Chrome for permission to access USB device.  Method must be activated by a user event (such as a button press);
+Requests Chrome for permission to access USB device.  Method must be activated by a user event (such as a button press).
 
 ```
 ow.requestPermission().then(gotPermission, failedPermission);
@@ -147,7 +153,7 @@ ow.deviceGetStatus()
   });
 ```
 
-### 1-Wire Commands
+### 1-Wire
 #### `wireDetectShort()`
 Detects short in the line and passes the result into callback.
 
