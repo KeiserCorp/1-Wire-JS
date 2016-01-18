@@ -39,7 +39,7 @@ ow.requestPermission().then(success, failure);
 - [Transfer](#transfer)
 - [Device Control](#device-control)
 - [1-Wire](#1-wire)
-- [Key](#keye)
+- [Key](#key)
 
 ### Permission
 #### `checkPermission()`
@@ -271,6 +271,85 @@ Performs a key ROM skip at overdrive speed.
 
 ```
 ow.keyRomSkipOverdrive().then(keyRomSkipped);
+```
+
+#### `keySearchFirst()`
+Searches network for keys and passes the first key ROM to the callback.
+
+```
+ow.keySearchFirst()
+  .then(function(rom){
+      keyROM = rom;
+  });
+```
+
+#### `keySearchNext()`
+Searches network for keys and passes the next key ROM to the callback.
+
+*This method will loop through key ROMs*
+
+```
+ow.keySearchNext()
+  .then(function(rom){
+      keyRom = rom;
+  });
+```
+
+#### `keyReadAll(keyRom, overdrive)`
+Reads all of the data from the key targeted by `keyRom` and passes the data to the callback.
+
+`keyRom` is the target key ROM stored as `Uint8Array`.
+
+`overdrive` is a boolean value determining operation speed. *(Default: false)*
+
+```
+ow.keyReadAll(keyRom, true)
+  .then(function(data){
+      keyData = data;
+  });
+```
+
+#### `keyWrite(keyRom, offset, data, overdrive)`
+Writes `data` to the key targeted by `keyRom`.
+
+`keyRom` is the target key ROM stored as `Uint8Array`.
+
+`offset` is the memory offset where the data is to be written.
+
+`data` is the data to be written to the key memory stored as `Uint8Array`.
+
+`overdrive` is a boolean value determining operation speed. *(Default: false)*
+
+```
+ow.keyWrite(keyRom, 0x00, data, true).then(writeComplete);
+```
+
+#### `keyWriteAll(keyRom, data, overdrive)`
+Writes `data` to the key targeted by `keyRom` starting at the memory beginning.
+
+`keyRom` is the target key ROM stored as `Uint8Array`.
+
+`data` is the data to be written to the key memory stored as `Uint8Array`.
+
+`overdrive` is a boolean value determining operation speed. *(Default: false)*
+
+```
+ow.keyWriteAll(keyRom, data, true).then(writeComplete);
+```
+
+#### `keyWriteDiff(keyRom, newData, oldData, overdrive)`
+Writes `newData` to the key targeted by `keyRom` starting at the memory beginning using a diffing algorithm to speed up writes.
+
+`keyRom` is the target key ROM stored as `Uint8Array`.
+
+`newData` is the data to be written to the key memory stored as `Uint8Array`.
+
+`oldData` is the current key memory stored as `Uint8Array`.
+
+`overdrive` is a boolean value determining operation speed. *(Default: false)*
+
+```
+ow.keyWriteAll(keyRom, newData, lastDump, true).then(writeComplete);
 ```
 
 ## Contributors
