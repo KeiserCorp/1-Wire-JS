@@ -4325,16 +4325,45 @@ module.exports = function () {
 				if (connections && connections.length > 0) {
 					deviceConnection = connections[0];
 					deviceObject = devices[0];
-					chrome.usb.listInterfaces(deviceConnection, function (descriptors) {
-						deviceInterface = descriptors[0];
-						mapEndpoints();
-						claimDeviceInterface()
-							.then(deferred.resolve);
-					});
+					checkDeviceConfiguration(deviceConnection)
+						.then(function () {
+							return discoverDeviceInterface(deviceConnection)
+								.then(deferred.resolve);
+						})
+						.fail(
+							function () {
+								ow.device.open()
+									.then(deferred.resolve);
+							}
+						);
 				} else {
 					deferred.reject();
 				}
 			});
+		});
+		return deferred.promise;
+	};
+
+	var checkDeviceConfiguration = function (deviceConnection) {
+		var deferred = Q.defer();
+		chrome.usb.getConfiguration(deviceConnection, function (configDescriptor) {
+			if ((configDescriptor || {})
+				.configurationValue) {
+				deferred.resolve();
+			} else {
+				chrome.usb.setConfiguration(deviceConnection, 1, deferred.reject);
+			}
+		});
+		return deferred.promise;
+	};
+
+	var discoverDeviceInterface = function (deviceConnection) {
+		var deferred = Q.defer();
+		chrome.usb.listInterfaces(deviceConnection, function (descriptors) {
+			deviceInterface = descriptors[0];
+			mapEndpoints();
+			claimDeviceInterface()
+				.then(deferred.resolve);
 		});
 		return deferred.promise;
 	};
