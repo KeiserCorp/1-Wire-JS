@@ -11,7 +11,7 @@ module.exports = function () {
 
 	var crc8 = function (value) {
 		return crc.crc81wire(value);
-	}
+	};
 
 	const TRANSACTION_TIMEOUT = 10;
 
@@ -154,7 +154,7 @@ module.exports = function () {
 				item.call(scope, o);
 			});
 		}
-	}
+	};
 
 	ow.device.onDeviceAdded = new DeviceAddedEvent();
 
@@ -187,7 +187,7 @@ module.exports = function () {
 				item.call(scope, o);
 			});
 		}
-	}
+	};
 
 	ow.device.onDeviceRemoved = new DeviceRemovedEvent();
 
@@ -570,7 +570,7 @@ module.exports = function () {
 				return ow.wire.setSpeed(overdrive);
 			})
 			.then(function () {
-				return ow.device.bulkTransfer(bulkTransferInfo)
+				return ow.device.bulkTransfer(bulkTransferInfo);
 			});
 	};
 
@@ -667,7 +667,7 @@ module.exports = function () {
 			})
 			.then(function (searchResultObject) {
 				if (searchResultObject.searchResult) {
-					parameters.keys.push(searchResultObject.romId)
+					parameters.keys.push(searchResultObject.romId);
 				}
 				parameters.lastDiscrepancy = searchResultObject.searchResultObject;
 				parameters.lastDevice = searchResultObject.lastDevice;
@@ -867,7 +867,7 @@ module.exports = function () {
 				return ow.wire.write(command);
 			})
 			.then(function () {
-				return ow.wire.read(data.length)
+				return ow.wire.read(data.length);
 			})
 			.then(function (data) {
 				returnedData = data;
@@ -910,7 +910,7 @@ module.exports = function () {
 		return ow.key.write(keyRom, offset, data[page], overdrive)
 			.then(function () {
 				if (data.length > page + 1) {
-					return keyWriteAllOffset(keyRom, data, page + 1, overdrive)
+					return keyWriteAllOffset(keyRom, data, page + 1, overdrive);
 				}
 			});
 	};
@@ -936,13 +936,13 @@ module.exports = function () {
 				return element === oldData[page][index];
 			})) {
 			if (newData.length > page + 1) {
-				return keyWriteDiffOffset(keyRom, newData, oldData, page + 1, overdrive)
+				return keyWriteDiffOffset(keyRom, newData, oldData, page + 1, overdrive);
 			}
 		}
 		return ow.key.write(keyRom, offset, newData[page], overdrive)
 			.then(function () {
 				if (newData.length > page + 1) {
-					return keyWriteDiffOffset(keyRom, newData, oldData, page + 1, overdrive)
+					return keyWriteDiffOffset(keyRom, newData, oldData, page + 1, overdrive);
 				}
 			});
 	};
