@@ -179,10 +179,12 @@ Sends a reset and then checks for a wire short.
 ow.wire.rest().then(resetComplete);
 ```
 
-#### `wire.write(data)`
+#### `wire.write(data, clearWire)`
 Writes data onto the wire.
 
 `data` must be type `Uint8Array` or data loss may occur.
+
+Pass a `true` value as the `clearWire` parameter to have the wire cleared after the write operation.
 
 ```
 ow.wire.write(data).then(writeComplete);

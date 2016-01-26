@@ -429,7 +429,7 @@ module.exports = function () {
 	 *	1-Wire Write
 	 *****************************************/
 
-	ow.wire.write = function (data) {
+	ow.wire.write = function (data, clearWire) {
 		var bulkTransferInfo = {
 			direction: deviceEndpoints.bulkOut.direction,
 			endpoint: deviceEndpoints.bulkOut.address,
@@ -452,6 +452,11 @@ module.exports = function () {
 		return ow.device.bulkTransfer(bulkTransferInfo)
 			.then(function () {
 				return ow.device.controlTransfer(controlTransferInfo);
+			})
+			.then(function () {
+				if (clearWire) {
+					return ow.wire.read(data.length);
+				}
 			});
 	};
 
@@ -659,9 +664,8 @@ module.exports = function () {
 		return ow.wire.setSpeed(false)
 			.then(ow.wire.reset)
 			.then(function () {
-				return ow.wire.write(new Uint8Array([0xF0]));
+				return ow.wire.write(new Uint8Array([0xF0]), true);
 			})
-			.then(ow.wire.clearByte)
 			.then(function () {
 				return romSubSearch(searchObject);
 			})
@@ -751,11 +755,8 @@ module.exports = function () {
 			})
 			.then(function () {
 				var command = new Uint8Array([0xF0, 0x00, 0x00]);
-				return ow.wire.write(command);
+				return ow.wire.write(command, true);
 			})
-			.then(ow.wire.clearByte)
-			.then(ow.wire.clearByte)
-			.then(ow.wire.clearByte)
 			.then(function () {
 				return keyReadMemory();
 			});
@@ -819,12 +820,8 @@ module.exports = function () {
 			})
 			.then(function () {
 				var command = new Uint8Array([0x55, offsetMSB, offsetLSB, endingOffset]);
-				return ow.wire.write(command);
-			})
-			.then(ow.wire.clearByte)
-			.then(ow.wire.clearByte)
-			.then(ow.wire.clearByte)
-			.then(ow.wire.clearByte)
+				return ow.wire.write(command, true);
+			});
 	};
 
 	var writeToScratch = function (keyRom, offset, data, overdrive) {
@@ -846,11 +843,8 @@ module.exports = function () {
 			})
 			.then(function () {
 				var command = new Uint8Array([0x0F, offsetMSB, offsetLSB]);
-				return ow.wire.write(command);
+				return ow.wire.write(command, true);
 			})
-			.then(ow.wire.clearByte)
-			.then(ow.wire.clearByte)
-			.then(ow.wire.clearByte)
 			.then(function () {
 				return writeData(data, 0);
 			})
