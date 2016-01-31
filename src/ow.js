@@ -1,7 +1,8 @@
 module.exports = function () {
 	'use strict';
 	var Q = require('q');
-	var crc = require('crc');
+	//var crc = require('crc');
+	var crc8 = require('../node_modules/crc/lib/crc8_1wire');
 	var ow = {
 		permission: {},
 		device: {},
@@ -9,9 +10,9 @@ module.exports = function () {
 		key: {}
 	};
 
-	var crc8 = function (value) {
-		return crc.crc81wire(value);
-	};
+	// var crc8 = function (value) {
+	// 	return crc.crc81wire(value);
+	// };
 
 	const TRANSACTION_TIMEOUT = 10;
 
