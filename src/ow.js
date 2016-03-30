@@ -115,8 +115,7 @@ module.exports = function () {
 	};
 
 	ow.device.close = function () {
-		return releaseDeviceInterface()
-			.
+		return releaseDeviceInterface().
 		then(chrome.usb.closeDevice(deviceConnection, function () {
 			deviceObject = null;
 			deviceConnection = null;
@@ -261,7 +260,7 @@ module.exports = function () {
 
 		transferInfo.timeout = TRANSACTION_TIMEOUT;
 		chrome.usb.controlTransfer(deviceConnection, transferInfo, function (result) {
-			if (!result.resultCode) {
+			if (result && !result.resultCode) {
 				deferred.resolve(result);
 			} else {
 				deferred.reject(chrome.runtime.lastError);
@@ -280,7 +279,7 @@ module.exports = function () {
 
 		transferInfo.timeout = TRANSACTION_TIMEOUT;
 		chrome.usb.bulkTransfer(deviceConnection, transferInfo, function (result) {
-			if (!result.resultCode) {
+			if (result && !result.resultCode) {
 				deferred.resolve(result);
 			} else {
 				deferred.reject(chrome.runtime.lastError);
