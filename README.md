@@ -1,6 +1,6 @@
 # 1-Wire® for Javascript
 ## Project
-1-Wire® Communication implemented in Javascript for Chrome using `chrome.udb`.
+1-Wire® Communication implemented in Javascript for Chrome using `chrome.usb`.
 
 ## Getting Started
 You have following options to get started:
