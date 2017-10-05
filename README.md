@@ -353,8 +353,5 @@ Writes `newData` to the key targeted by `keyRom` starting at the memory beginnin
 ow.key.writeAll(keyRom, newData, lastDump, true).then(writeComplete);
 ```
 
-## Contributors
-- [bayssmekanique](https://github.com/bayssmekanique)
-
-## Copyright and License
+## License
 Licensed under the [MIT license](LICENSE.md).
